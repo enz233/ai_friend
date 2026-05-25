@@ -1,0 +1,24 @@
+{
+  "name": "quiet-companion",
+  "version": "0.1.0",
+  "description": "A quiet digital companion that lives on the desktop",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "dev": "tsc && electron ."
+  },
+  "keywords": [
+    "desktop-pet",
+    "companion",
+    "electron"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "electron": "^42.2.0",
+    "typescript": "^6.0.3"
+  }
+}

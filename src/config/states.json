@@ -1,0 +1,232 @@
+{
+  "version": "1.0",
+  "states": {
+    "idle": {
+      "id": "idle",
+      "animation": "idle_breathing",
+      "eyeState": "open",
+      "mouthState": "neutral",
+      "blinkRate": "normal",
+      "movement": "gentle",
+      "microBehaviors": ["blink", "breathing", "occasional_glance"],
+      "duration": { "min": 30, "max": 120 },
+      "priority": 5,
+      "bubble": {
+        "probability": 0.05,
+        "messages": ["~", "...", "♪"]
+      }
+    },
+    "curious": {
+      "id": "curious",
+      "animation": "curious_tilt",
+      "eyeState": "open",
+      "mouthState": "small_smile",
+      "blinkRate": "fast",
+      "movement": "active",
+      "microBehaviors": ["eye_tracking", "head_tilt"],
+      "duration": { "min": 3, "max": 8 },
+      "priority": 3,
+      "bubble": {
+        "probability": 0.15,
+        "messages": ["?", "~?", "嗯？"]
+      }
+    },
+    "dragged": {
+      "id": "dragged",
+      "animation": "dragged_sway",
+      "eyeState": "open",
+      "mouthState": "neutral",
+      "blinkRate": "fast",
+      "movement": "active",
+      "microBehaviors": ["body_sway"],
+      "duration": { "min": 1, "max": 3 },
+      "priority": 10,
+      "bubble": {
+        "probability": 0.3,
+        "messages": ["哇", "...", "～"]
+      }
+    },
+    "sleepy": {
+      "id": "sleepy",
+      "animation": "sleepy_droop",
+      "eyeState": "half_closed",
+      "mouthState": "yawn",
+      "blinkRate": "slow",
+      "movement": "still",
+      "microBehaviors": ["yawn", "slow_breathing", "head_droop"],
+      "duration": { "min": 60, "max": 180 },
+      "priority": 6,
+      "bubble": {
+        "probability": 0.1,
+        "messages": ["好困...", "zzZ", "呼..."]
+      }
+    },
+    "sleeping": {
+      "id": "sleeping",
+      "animation": "sleeping_breath",
+      "eyeState": "closed",
+      "mouthState": "neutral",
+      "blinkRate": "slow",
+      "movement": "still",
+      "microBehaviors": ["slow_breathing"],
+      "duration": { "min": 300, "max": 9999 },
+      "priority": 9,
+      "bubble": null
+    },
+    "lonely": {
+      "id": "lonely",
+      "animation": "lonely_look",
+      "eyeState": "open",
+      "mouthState": "neutral",
+      "blinkRate": "normal",
+      "movement": "still",
+      "microBehaviors": ["look_around", "slight_sigh"],
+      "duration": { "min": 60, "max": 120 },
+      "priority": 4,
+      "bubble": {
+        "probability": 0.08,
+        "messages": ["...", "在吗", "嗯..."]
+      }
+    },
+    "comfortable": {
+      "id": "comfortable",
+      "animation": "comfortable_relax",
+      "eyeState": "open",
+      "mouthState": "small_smile",
+      "blinkRate": "normal",
+      "movement": "gentle",
+      "microBehaviors": ["blink", "gentle_smile", "stretch"],
+      "duration": { "min": 30, "max": 60 },
+      "priority": 5,
+      "bubble": {
+        "probability": 0.1,
+        "messages": ["嘿嘿", "~", "♪~"]
+      }
+    }
+  },
+  "transitions": {
+    "idle_to_curious": {
+      "from": "idle",
+      "to": "curious",
+      "trigger": "interaction",
+      "condition": { "cursorDistance": "< 200" },
+      "priority": 3
+    },
+    "idle_to_sleepy": {
+      "from": "idle",
+      "to": "sleepy",
+      "trigger": "time",
+      "condition": { "timeRange": [22, 1] },
+      "priority": 6
+    },
+    "idle_to_lonely": {
+      "from": "idle",
+      "to": "lonely",
+      "trigger": "timer",
+      "condition": { "noInteractionTime": "> 600" },
+      "priority": 2
+    },
+    "curious_to_idle": {
+      "from": "curious",
+      "to": "idle",
+      "trigger": "interaction",
+      "condition": { "cursorDistance": "> 300" },
+      "priority": 3
+    },
+    "curious_to_comfortable": {
+      "from": "curious",
+      "to": "comfortable",
+      "trigger": "interaction",
+      "condition": { "cursorDistance": "> 300" },
+      "priority": 4
+    },
+    "dragged_to_idle": {
+      "from": "dragged",
+      "to": "idle",
+      "trigger": "interaction",
+      "condition": {},
+      "priority": 10
+    },
+    "dragged_to_comfortable": {
+      "from": "dragged",
+      "to": "comfortable",
+      "trigger": "random",
+      "condition": { "probability": 0.4 },
+      "priority": 5
+    },
+    "sleepy_to_sleeping": {
+      "from": "sleepy",
+      "to": "sleeping",
+      "trigger": "time",
+      "condition": { "timeRange": [1, 6] },
+      "priority": 8
+    },
+    "sleepy_to_idle": {
+      "from": "sleepy",
+      "to": "idle",
+      "trigger": "time",
+      "condition": { "timeRange": [6, 22] },
+      "priority": 5
+    },
+    "sleeping_to_idle": {
+      "from": "sleeping",
+      "to": "idle",
+      "trigger": "time",
+      "condition": { "timeRange": [6, 9] },
+      "priority": 7
+    },
+    "sleeping_to_sleepy": {
+      "from": "sleeping",
+      "to": "sleepy",
+      "trigger": "interaction",
+      "condition": {},
+      "priority": 9
+    },
+    "lonely_to_idle": {
+      "from": "lonely",
+      "to": "idle",
+      "trigger": "timer",
+      "condition": { "noInteractionTime": "> 120" },
+      "priority": 2
+    },
+    "lonely_to_curious": {
+      "from": "lonely",
+      "to": "curious",
+      "trigger": "interaction",
+      "condition": { "cursorDistance": "< 200" },
+      "priority": 4
+    },
+    "comfortable_to_idle": {
+      "from": "comfortable",
+      "to": "idle",
+      "trigger": "timer",
+      "condition": { "noInteractionTime": "> 30" },
+      "priority": 2
+    },
+    "any_to_dragged": {
+      "from": "any",
+      "to": "dragged",
+      "trigger": "interaction",
+      "condition": {},
+      "priority": 10
+    }
+  },
+  "timeAwareness": {
+    "timeSlots": {
+      "late_night": { "range": [1, 6], "effect": "force_sleeping" },
+      "morning": { "range": [6, 9], "effect": "natural_wake" },
+      "forenoon": { "range": [9, 12], "effect": "normal" },
+      "afternoon": { "range": [12, 18], "effect": "normal" },
+      "afternoon_drowsy": { "range": [13, 14], "effect": "slight_sleepy_boost" },
+      "evening": { "range": [18, 22], "effect": "calm_boost" },
+      "night": { "range": [22, 1], "effect": "sleepy_boost" }
+    }
+  },
+  "antiJitter": {
+    "cooldownSeconds": 5,
+    "hysteresis": {
+      "curious_enter": 200,
+      "curious_exit": 300
+    }
+  }
+}

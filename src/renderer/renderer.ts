@@ -84,7 +84,6 @@
 
     // @ts-ignore
     window.companion.onStateChanged(function (event: any) {
-      console.log('State changed:', event.from, '->', event.to);
       currentState = event.to;
       onStateEnter(event.to);
     });
@@ -113,7 +112,6 @@
   }
 
   function updateVisual(state: string, _definition: any): void {
-    console.log('State update:', state);
     stopSleepAnim();
     if (isBlinking && state === 'idle') return;
 

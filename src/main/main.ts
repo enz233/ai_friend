@@ -92,7 +92,6 @@ function createWindow(): void {
   });
 
   ipcMain.on('drag-end', () => {
-    console.log('IPC: drag-end received');
     transitionEngine?.handleDragEnd();
   });
 

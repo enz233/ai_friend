@@ -95,6 +95,17 @@ html, body {
   animation: lonely-sway 4s ease-in-out infinite;
 }
 
+/* 疲惫 - 轻微摇晃 */
+@keyframes tried-sway {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  30% { transform: translateX(-50%) translateY(1px) rotate(-1deg); }
+  70% { transform: translateX(-50%) translateY(1px) rotate(1deg); }
+}
+
+#companion.tried {
+  animation: tried-sway 3.5s ease-in-out infinite;
+}
+
 /* 舒适 - 轻摇 */
 @keyframes comfortable-sway {
   0%, 100% { transform: translateX(-50%) rotate(0deg) translateY(0); }

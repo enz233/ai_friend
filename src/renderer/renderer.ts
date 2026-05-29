@@ -10,6 +10,7 @@
   var sleepyAnimTimer: ReturnType<typeof setTimeout> | null = null;
   var lonelyAnimTimer: ReturnType<typeof setTimeout> | null = null;
   var lonelyActionTimer: ReturnType<typeof setTimeout> | null = null;
+  var triedAnimTimer: ReturnType<typeof setTimeout> | null = null;
   var isBlinking = false;
 
   // 拖拽动画相关
@@ -62,6 +63,8 @@
 
     companionEl.addEventListener('mousedown', function () {
       isDragging = true;
+      isDraggingGlobal = true;
+      isDragVisualActive = true;
       dragStarted = false;
       dragFirstMove = true;
       dragTransitionDone = false;
@@ -70,6 +73,7 @@
       currentDragDirection = null;
       // 点击立即显示 dragged
       setSprite('dragged');
+      companionEl.className = 'dragged';
       // @ts-ignore
       window.companion.sendDragStart();
     });
@@ -78,14 +82,9 @@
       if (!isDragging) return;
       if (e.movementX === 0 && e.movementY === 0) return;
 
-      // 首次移动时才触发拖拽
+      // 首次移动时标记拖拽开始
       if (!dragStarted) {
         dragStarted = true;
-        isDraggingGlobal = true;
-        isDragVisualActive = true;
-        setSprite('dragged');
-        // @ts-ignore
-        window.companion.sendDragStart();
       }
 
       // 方向判定（视觉用）
@@ -102,9 +101,9 @@
         isDraggingGlobal = false;
         isDragVisualActive = false;
         stopDragAnim();
+        dragStarted = false;
         // @ts-ignore
         window.companion.sendDragEnd();
-        dragStarted = false;
       }
     });
   }
@@ -188,7 +187,16 @@
 
   function setSprite(name: string): void {
     if (!SPRITE_DIR) return;
-    spriteEl.src = SPRITE_DIR + name + '.png';
+    // 根据名字前缀确定子目录
+    var folder = 'basic/misc';
+    if (name.indexOf('idle') === 0) folder = 'basic/idle';
+    else if (name.indexOf('sleepy') === 0) folder = 'basic/sleepy';
+    else if (name.indexOf('sleep') === 0) folder = 'basic/sleeping';
+    else if (name.indexOf('dragged') === 0) folder = 'basic/dragged';
+    else if (name.indexOf('lonely') === 0) folder = 'basic/lonely';
+    else if (name.indexOf('comfortable') === 0) folder = 'basic/comfortable';
+    else if (name.indexOf('tried') === 0) folder = 'basic/tried';
+    spriteEl.src = SPRITE_DIR + folder + '/' + name + '.png';
   }
 
   function stopSleepAnim(): void {
@@ -395,6 +403,85 @@
     }, 1500);
   }
 
+  function stopTriedAnim(): void {
+    if (triedAnimTimer) {
+      clearTimeout(triedAnimTimer);
+      triedAnimTimer = null;
+    }
+  }
+
+  /** tried 动画：0→1→2→3→4 快速 → 3↔4 循环30s → 4→3→2→1→0 慢回 idle */
+  function startTriedAnim(): void {
+    stopTriedAnim();
+
+    // 快速进入：0→1→2→3→4（200ms每帧）
+    var enter = ['tried_0', 'tried_1', 'tried_2', 'tried_3', 'tried_4'];
+    var i = 0;
+    function playEnter(): void {
+      triedAnimTimer = setTimeout(function () {
+        if (currentState !== 'tried') return;
+        setSprite(enter[i]);
+        i++;
+        if (i < enter.length) {
+          playEnter();
+        } else {
+          // 进入循环阶段
+          startTriedCycle();
+        }
+      }, 200);
+    }
+    setSprite(enter[0]);
+    i = 1;
+    playEnter();
+  }
+
+  /** tried 循环阶段：3↔4 交替，持续到状态超时前 */
+  function startTriedCycle(): void {
+    // 循环持续 约10秒（为退出动画留时间）
+    var duration = 9000 + Math.random() * 2000;
+    var startTime = Date.now();
+    var showAlt = false;
+
+    function cycle(): void {
+      triedAnimTimer = setTimeout(function () {
+        if (currentState !== 'tried') return;
+        if (Date.now() - startTime > duration) {
+          // 循环结束，开始退出
+          playTriedExit();
+          return;
+        }
+        showAlt = !showAlt;
+        setSprite(showAlt ? 'tried_4' : 'tried_3');
+        cycle();
+      }, 1000);
+    }
+    setSprite('tried_3');
+    cycle();
+  }
+
+  /** tried 退出：4→3→2→1→0（500ms每帧）→ idle */
+  function playTriedExit(): void {
+    var exit = ['tried_4', 'tried_3', 'tried_2', 'tried_1', 'tried_0'];
+    var i = 0;
+    function playExit(): void {
+      triedAnimTimer = setTimeout(function () {
+        if (currentState !== 'tried') return;
+        setSprite(exit[i]);
+        i++;
+        if (i < exit.length) {
+          playExit();
+        } else {
+          // 通知主进程切回 idle
+          // @ts-ignore
+          window.companion.sendStateFinished();
+        }
+      }, 500);
+    }
+    setSprite(exit[0]);
+    i = 1;
+    playExit();
+  }
+
   var lastVisualState = '';
   var isLonelyExiting = false;
 
@@ -428,6 +515,7 @@
     stopSleepAnim();
     stopSleepyAnim();
     stopLonelyAnim();
+    stopTriedAnim();
 
     switch (state) {
       case 'idle':
@@ -459,6 +547,10 @@
         companionEl.className = 'comfortable';
         setSprite('comfortable');
         break;
+      case 'tried':
+        companionEl.className = 'tried';
+        startTriedAnim();
+        break;
     }
   }
 
@@ -483,6 +575,7 @@
       sleepy: { probability: 0.1, messages: ['好困...', 'zzZ', '呼...'] },
       lonely: { probability: 0.08, messages: ['...', '在吗', '嗯...'] },
       comfortable: { probability: 0.1, messages: ['嘿嘿', '~', '♪~'] },
+      tried: { probability: 0.08, messages: ['好累...', '呼...', '...'] },
     };
     return bubbles[state] ?? null;
   }

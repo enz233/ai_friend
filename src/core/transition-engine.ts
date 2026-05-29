@@ -18,6 +18,7 @@ export class TransitionEngine {
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private isCursorNear: boolean = false;
   private isLonelyAction: boolean = false;
+  private dragStartTime: number = 0;
 
   constructor(stateManager: StateManager, timeAwareness: TimeAwareness) {
     this.stateManager = stateManager;
@@ -82,12 +83,17 @@ export class TransitionEngine {
       }
     }
 
-    // 状态超时 → 回 idle
-    if (duration > stateDef.duration.max) {
+    // 状态超时 → 回 idle（dragged 不靠超时，靠 mouseup）
+    if (duration > stateDef.duration.max && currentState !== 'dragged') {
       if (currentState !== 'idle') {
         this.stateManager.tryTransition('idle', 'timer');
       }
     }
+  }
+
+  /** 动画结束时由渲染进程调用，切回 idle */
+  handleStateFinished(): void {
+    this.stateManager.tryTransition('idle', 'timer');
   }
 
   /** 设置 lonely 小动作播放状态 */
@@ -117,14 +123,24 @@ export class TransitionEngine {
   /** 拖拽开始：从任何状态切换到 dragged */
   handleDragStart(): void {
     this.stateManager.recordInteraction();
+    this.dragStartTime = Date.now();
     this.stateManager.tryTransition('dragged', 'interaction');
   }
 
-  /** 拖拽结束：回 idle 或 comfortable（深夜回 sleepy） */
+  /** 拖拽结束：回 idle 或 comfortable 或 tried（深夜回 sleepy） */
   handleDragEnd(): void {
     this.stateManager.recordInteraction();
     if (this.timeAwareness.isLateNight()) {
       this.stateManager.tryTransition('sleepy', 'interaction');
+      return;
+    }
+
+    // 拖拽时间越长，进入 tried 的概率越高
+    var dragDuration = (Date.now() - this.dragStartTime) / 1000;
+    var triedChance = Math.min(0.1 + dragDuration * 0.05, 0.6); // 1秒10%，10秒60%
+
+    if (Math.random() < triedChance) {
+      this.stateManager.tryTransition('tried', 'interaction');
     } else if (Math.random() < 0.4) {
       this.stateManager.tryTransition('comfortable', 'interaction');
     } else {

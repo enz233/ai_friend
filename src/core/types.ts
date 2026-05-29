@@ -8,7 +8,8 @@ export type StateId =
   | 'sleepy'
   | 'sleeping'
   | 'lonely'
-  | 'comfortable';
+  | 'comfortable'
+  | 'tried';
 
 /** 眼睛状态 */
 export type EyeState = 'open' | 'half_closed' | 'closed';

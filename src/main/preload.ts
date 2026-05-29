@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('companion', {
   sendLonelyAction: (active: boolean) => {
     ipcRenderer.send('lonely-action', active);
   },
+  sendStateFinished: () => {
+    ipcRenderer.send('state-finished');
+  },
   onStateChanged: (callback: (event: any) => void) => {
     ipcRenderer.on('state-changed', (_event, data) => callback(data));
   },

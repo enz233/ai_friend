@@ -134,6 +134,10 @@ function createWindow(): void {
     transitionEngine?.setLonelyAction(active);
   });
 
+  ipcMain.on('state-finished', () => {
+    transitionEngine?.handleStateFinished();
+  });
+
   // 相对移动窗口（拖拽时由主进程轮询处理，这里保留给其他用途）
   ipcMain.on('window-move-by', (_event, data: { deltaX: number; deltaY: number }) => {
     if (!mainWindow || mainWindow.isDestroyed() || isDragging) return;

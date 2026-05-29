@@ -1,5 +1,15 @@
 # Quiet Companion - 版本记录
 
+## v0.1.5 (2026-05-29)
+- tried（疲惫）状态：拖拽后概率触发，拖拽越久概率越高
+- tried动画：tried_0~4快速进入 → 3↔4循环10秒 → 慢速退出回idle
+- tried轻摇CSS动画
+- 精灵图按状态分文件夹整理（sprites/basic/）
+- setSprite自动根据名字前缀匹配子目录
+- 修复dragged状态：mousedown时就设置isDragVisualActive和CSS
+- 修复tried退出动画：通过IPC通知主进程切回idle
+- 深夜拖拽不被打断，松开后走sleepy→sleeping
+
 ## v0.1.4_debug (2026-05-28)
 - 修复 lastVisualState 在早返回前被设置导致精灵图不更新
 - 修复眨眼动画覆盖非 idle 状态的精灵图

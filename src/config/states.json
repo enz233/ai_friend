@@ -102,6 +102,21 @@
         "probability": 0.1,
         "messages": ["嘿嘿", "~", "♪~"]
       }
+    },
+    "tried": {
+      "id": "tried",
+      "animation": "tried_tired",
+      "eyeState": "half_closed",
+      "mouthState": "neutral",
+      "blinkRate": "slow",
+      "movement": "still",
+      "microBehaviors": ["slow_breathing"],
+      "duration": { "min": 12, "max": 15 },
+      "priority": 4,
+      "bubble": {
+        "probability": 0.08,
+        "messages": ["好累...", "呼...", "..."]
+      }
     }
   },
   "transitions": {

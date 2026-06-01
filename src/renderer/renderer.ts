@@ -23,6 +23,11 @@
   var isDragVisualActive = false; // 拖拽视觉是否激活（mousedown到mouseup之间）
   var sleepyAnimRunning = false;
 
+  // 交互气泡相关
+  var clickTimes: number[] = [];
+  var dragStartTime = 0;
+  var dragBubbleTimer: ReturnType<typeof setTimeout> | null = null;
+
   var companionEl = document.getElementById('companion')!;
   var spriteEl = document.getElementById('sprite') as HTMLImageElement;
   var bubbleEl = document.getElementById('bubble')!;
@@ -62,20 +67,32 @@
     var dragStarted = false; // 是否真正开始拖拽（有移动）
 
     companionEl.addEventListener('mousedown', function () {
+      console.log('[Drag] mousedown');
       isDragging = true;
       isDraggingGlobal = true;
       isDragVisualActive = true;
       dragStarted = false;
+      dragStartTime = Date.now();
       dragFirstMove = true;
       dragTransitionDone = false;
       dragAccumX = 0;
       dragAccumY = 0;
       currentDragDirection = null;
-      // 点击立即显示 dragged
+      // 点击立即显示 dragged，打断当前气泡
       setSprite('dragged');
       companionEl.className = 'dragged';
+      showBubble('哇！');
       // @ts-ignore
       window.companion.sendDragStart();
+
+      // 拖拽 8 秒后显示气泡
+      if (dragBubbleTimer) clearTimeout(dragBubbleTimer);
+      dragBubbleTimer = setTimeout(function () {
+        if (isDragging) {
+          var msgs = ['放我下来...', '够了够了', '呼...', '累了吗~'];
+          showBubble(msgs[Math.floor(Math.random() * msgs.length)]);
+        }
+      }, 8000);
     });
 
     document.addEventListener('mousemove', function (e: MouseEvent) {
@@ -97,11 +114,14 @@
 
     document.addEventListener('mouseup', function () {
       if (isDragging) {
+        var dragDuration = (Date.now() - dragStartTime) / 1000;
+        console.log('[Drag] mouseup, 拖拽时长:', dragDuration.toFixed(1) + 's');
         isDragging = false;
         isDraggingGlobal = false;
         isDragVisualActive = false;
         stopDragAnim();
         dragStarted = false;
+        if (dragBubbleTimer) { clearTimeout(dragBubbleTimer); dragBubbleTimer = null; }
         // @ts-ignore
         window.companion.sendDragEnd();
       }
@@ -169,6 +189,17 @@
     companionEl.addEventListener('click', function () {
       // @ts-ignore
       window.companion.sendClick();
+
+      // 快速点击检测
+      var now = Date.now();
+      clickTimes.push(now);
+      // 只保留最近3秒内的点击
+      clickTimes = clickTimes.filter(function (t) { return now - t < 3000; });
+      if (clickTimes.length >= 4) {
+        var msgs = ['嗯嗯？', '怎么了', '别戳啦', '...', '有事吗~'];
+        showBubble(msgs[Math.floor(Math.random() * msgs.length)]);
+        clickTimes = [];
+      }
     });
   }
 
@@ -181,7 +212,13 @@
     // @ts-ignore
     window.companion.onStateChanged(function (event: any) {
       currentState = event.to;
-      onStateEnter(event.to);
+      onStateEnter(event.to, event.from);
+    });
+
+    // 主进程发来的气泡（问候、活动监视等）
+    // @ts-ignore
+    window.companion.onShowBubble(function (text: string) {
+      showBubble(text);
     });
   }
 
@@ -196,7 +233,9 @@
     else if (name.indexOf('lonely') === 0) folder = 'basic/lonely';
     else if (name.indexOf('comfortable') === 0) folder = 'basic/comfortable';
     else if (name.indexOf('tried') === 0) folder = 'basic/tried';
-    spriteEl.src = SPRITE_DIR + folder + '/' + name + '.png';
+    var path = SPRITE_DIR + folder + '/' + name + '.png';
+    console.log('[Sprite]', name);
+    spriteEl.src = path;
   }
 
   function stopSleepAnim(): void {
@@ -486,13 +525,18 @@
   var isLonelyExiting = false;
 
   function updateVisual(state: string, _definition: any): void {
+    console.log('[Visual] state:', state, 'last:', lastVisualState, 'isDragActive:', isDragVisualActive);
     if (state === lastVisualState) return;
+
+    var prevState = lastVisualState;
+    // 先更新 lastVisualState，确保拖拽期间状态变化被追踪
+    lastVisualState = state;
 
     // 退出动画播放中不更新精灵图
     if (isLonelyExiting) return;
 
     // 离开 lonely 时先播放反向退出动画
-    if (lastVisualState === 'lonely' && state !== 'lonely') {
+    if (prevState === 'lonely' && state !== 'lonely') {
       isLonelyExiting = true;
       playLonelyExit(function () {
         isLonelyExiting = false;
@@ -505,6 +549,8 @@
     if (isBlinking && state === 'idle') return;
     // 拖拽期间不覆盖精灵图
     if (isDragVisualActive) return;
+    // 拖拽已结束但主进程还在发旧的 dragged 状态，忽略
+    if (state === 'dragged' && !isDragVisualActive) return;
 
     // 离开眨眼状态时重置标记
     if (state !== 'idle' && state !== 'curious') {
@@ -554,7 +600,16 @@
     }
   }
 
-  function onStateEnter(state: string): void {
+  function onStateEnter(state: string, from?: string): void {
+    // 唤醒气泡
+    if (from === 'sleeping' && state !== 'sleeping') {
+      var msgs = ['嗯...', '天亮了？', '呼~', '...？'];
+      showBubble(msgs[Math.floor(Math.random() * msgs.length)]);
+    } else if (from === 'lonely' && state !== 'lonely') {
+      var msgs2 = ['你来啦！', '终于', '~！', '在呢在呢'];
+      showBubble(msgs2[Math.floor(Math.random() * msgs2.length)]);
+    }
+
     maybeShowBubble(state);
   }
 
@@ -575,7 +630,7 @@
       sleepy: { probability: 0.1, messages: ['好困...', 'zzZ', '呼...'] },
       lonely: { probability: 0.08, messages: ['...', '在吗', '嗯...'] },
       comfortable: { probability: 0.1, messages: ['嘿嘿', '~', '♪~'] },
-      tried: { probability: 0.08, messages: ['好累...', '呼...', '...'] },
+      tried: { probability: 0.3, messages: ['好累...', '呼...', '...'] },
     };
     return bubbles[state] ?? null;
   }

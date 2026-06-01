@@ -3,11 +3,13 @@ import * as path from 'path';
 import { StateManager } from '../core/state-manager';
 import { TimeAwareness } from '../core/time-awareness';
 import { TransitionEngine } from '../core/transition-engine';
+import { BubbleManager } from '../core/bubble-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let stateManager: StateManager;
 let timeAwareness: TimeAwareness;
 let transitionEngine: TransitionEngine;
+let bubbleManager: BubbleManager;
 
 // 拖拽状态（主进程端）
 let isDragging = false;
@@ -67,6 +69,15 @@ function createWindow(): void {
 
   // 启动转移引擎
   transitionEngine.start(1000);
+
+  // 初始化气泡管理器
+  bubbleManager = new BubbleManager(mainWindow, timeAwareness, stateManager);
+  // 延迟发送问候语（等渲染进程就绪）
+  setTimeout(() => {
+    bubbleManager.showGreeting();
+  }, 1500);
+  // 启动活动监视（每45秒检测一次）
+  bubbleManager.startActivityMonitor(45000);
 
   // 定时发送当前状态给渲染进程（用于UI更新）
   setInterval(() => {

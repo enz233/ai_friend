@@ -72,6 +72,27 @@ export class TimeAwareness {
    * 判断当前时间是否在指定范围内
    * 支持跨午夜的范围（如 [22, 1] 表示 22:00 到 01:00）
    */
+  /** 获取时段问候语 */
+  getGreeting(): string {
+    const hour = this.getCurrentHour();
+    const greetings: { range: [number, number]; messages: string[] }[] = [
+      { range: [6, 9], messages: ['早~', '早上好', '新的一天'] },
+      { range: [9, 12], messages: ['上午好', '嗨~', '在忙吗'] },
+      { range: [12, 14], messages: ['中午好', '午饭时间~', '饿了吗'] },
+      { range: [14, 18], messages: ['下午好', '在忙吗~', '加油'] },
+      { range: [18, 21], messages: ['晚上好', '辛苦了', '休息一下~'] },
+      { range: [21, 24], messages: ['夜深了~', '还在呀', '别太晚了'] },
+      { range: [0, 6], messages: ['还没睡吗...', '好晚了', '早点休息吧'] },
+    ];
+
+    for (const g of greetings) {
+      if (this.isInTimeRange(hour, g.range)) {
+        return g.messages[Math.floor(Math.random() * g.messages.length)];
+      }
+    }
+    return '嗨~';
+  }
+
   private isInTimeRange(hour: number, range: [number, number]): boolean {
     const [start, end] = range;
     if (start <= end) {

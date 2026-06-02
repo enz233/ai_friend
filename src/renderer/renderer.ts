@@ -42,6 +42,7 @@
 
     setupDragHandling();
     setupCursorTracking();
+    setupChatInput();
     setupStateListeners();
     scheduleNextBlink();
     setupClickThrough();
@@ -178,6 +179,41 @@
       currentDragDirection = newDirection;
       setSprite('dragged_' + newDirection);
     }
+  }
+
+  function setupChatInput(): void {
+    var chatInput = document.getElementById('chat-input') as HTMLInputElement;
+    if (!chatInput) return;
+
+    // 双击伙伴打开输入框
+    companionEl.addEventListener('dblclick', function (e) {
+      e.stopPropagation();
+      chatInput.classList.remove('hidden');
+      chatInput.focus();
+    });
+
+    // 回车发送
+    chatInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        var text = chatInput.value.trim();
+        if (text) {
+          // @ts-ignore
+          window.companion.sendUserMessage(text);
+          chatInput.value = '';
+        }
+      } else if (e.key === 'Escape') {
+        chatInput.classList.add('hidden');
+        chatInput.value = '';
+      }
+    });
+
+    // 失焦关闭
+    chatInput.addEventListener('blur', function () {
+      setTimeout(function () {
+        chatInput.classList.add('hidden');
+        chatInput.value = '';
+      }, 200);
+    });
   }
 
   function setupCursorTracking(): void {

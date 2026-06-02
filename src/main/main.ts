@@ -4,12 +4,18 @@ import { StateManager } from '../core/state-manager';
 import { TimeAwareness } from '../core/time-awareness';
 import { TransitionEngine } from '../core/transition-engine';
 import { BubbleManager } from '../core/bubble-manager';
+import { AIConfigManager } from '../core/ai-config';
+import { AIService } from '../core/ai-service';
+import { ChatManager } from '../core/chat-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let stateManager: StateManager;
 let timeAwareness: TimeAwareness;
 let transitionEngine: TransitionEngine;
 let bubbleManager: BubbleManager;
+let aiConfigManager: AIConfigManager;
+let aiService: AIService;
+let chatManager: ChatManager;
 
 // 拖拽状态（主进程端）
 let isDragging = false;
@@ -44,10 +50,13 @@ function createWindow(): void {
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
   mainWindow.loadFile(path.join(__dirname, '..', '..', 'src', 'renderer', 'index.html'));
 
-  // F12 打开独立调试窗口
+  // F12 打开独立调试窗口，F11 打开设置
   mainWindow.webContents.on('before-input-event', (_event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
+    }
+    if (input.key === 'F11' && input.type === 'keyDown') {
+      createSettingsWindow();
     }
   });
 
@@ -78,6 +87,11 @@ function createWindow(): void {
   }, 1500);
   // 启动活动监视（每45秒检测一次）
   bubbleManager.startActivityMonitor(45000);
+
+  // 初始化 AI 模块
+  aiConfigManager = new AIConfigManager();
+  aiService = new AIService(aiConfigManager);
+  chatManager = new ChatManager(mainWindow, aiConfigManager, aiService);
 
   // 定时发送当前状态给渲染进程（用于UI更新）
   setInterval(() => {
@@ -169,6 +183,55 @@ function createWindow(): void {
       mainWindow.setIgnoreMouseEvents(true, { forward: true });
     }
   });
+
+  // AI 相关 IPC
+  ipcMain.on('user-message', (_event, text: string) => {
+    chatManager?.sendMessage(text);
+  });
+
+  ipcMain.on('open-settings', () => {
+    createSettingsWindow();
+  });
+
+  ipcMain.handle('load-ai-config', () => {
+    console.log('[AI] 加载配置');
+    const config = aiConfigManager?.get();
+    console.log('[AI] 配置:', config ? '已加载' : '未找到');
+    return config;
+  });
+
+  ipcMain.on('save-ai-config', (_event, config: any) => {
+    console.log('[AI] 保存配置');
+    aiConfigManager?.update(config);
+    console.log('[AI] 配置已保存');
+  });
+
+  ipcMain.handle('test-ai-connection', async () => {
+    console.log('[AI] 测试连接');
+    try {
+      const result = await aiService?.testConnection();
+      console.log('[AI] 测试结果:', result);
+      return result;
+    } catch (e: any) {
+      console.error('[AI] 测试失败:', e);
+      return { success: false, message: '测试失败: ' + e.message };
+    }
+  });
+}
+
+function createSettingsWindow(): void {
+  const settingsWindow = new BrowserWindow({
+    width: 500,
+    height: 600,
+    title: '设置',
+    resizable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  settingsWindow.loadFile(path.join(__dirname, '..', '..', 'src', 'main', 'settings.html'));
 }
 
 function stopDragPoll(): void {

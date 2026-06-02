@@ -153,6 +153,37 @@ html, body {
   border-top: 5px solid rgba(255, 255, 255, 0.92);
 }
 
+/* 聊天输入框 */
+#chat-input {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(5px);
+  font-size: 12px;
+  font-family: 'Microsoft YaHei', sans-serif;
+  color: #333;
+  outline: none;
+  transition: all 0.2s ease;
+  z-index: 100;
+}
+
+#chat-input::placeholder {
+  color: rgba(100, 100, 100, 0.7);
+  font-size: 11px;
+}
+
+#chat-input:focus {
+  border-color: rgba(100, 150, 255, 0.8);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 2px 8px rgba(100, 150, 255, 0.2);
+}
+
 .hidden {
   display: none;
 }

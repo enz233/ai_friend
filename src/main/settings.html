@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置 - Quiet Companion</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      padding: 20px;
+    }
+    h1 { font-size: 18px; margin-bottom: 20px; color: #222; }
+    h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #444; }
+    .section { margin-bottom: 24px; }
+    .divider { border: none; border-top: 1px solid #e0e0e0; margin: 16px 0; }
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+    input[type="text"], input[type="password"], textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, textarea:focus { border-color: #6aa3ff; }
+    textarea { resize: vertical; min-height: 80px; }
+    .field { margin-bottom: 12px; }
+    .hint { font-size: 11px; color: #999; margin-top: 2px; }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .slider-row label { min-width: 80px; margin-bottom: 0; }
+    .slider-row input[type="range"] { flex: 1; }
+    .slider-row .value { min-width: 40px; text-align: right; font-weight: 600; color: #6aa3ff; }
+    .btn {
+      display: inline-block;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #6aa3ff; color: #fff; }
+    .btn-primary:hover { background: #5590ee; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-secondary { background: #e0e0e0; color: #333; margin-left: 8px; }
+    .btn-secondary:hover { background: #d0d0d0; }
+    .btn-row { margin-top: 16px; }
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+    .alert.success { background: #e8f5e9; color: #2e7d32; display: block; }
+    .alert.error { background: #ffebee; color: #c62828; display: block; }
+    .password-wrap { position: relative; }
+    .password-wrap input { padding-right: 36px; }
+    .toggle-pw {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚙ 设置</h1>
+
+  <div class="section">
+    <h2>API 配置</h2>
+    <hr class="divider">
+    <div class="field">
+      <label>API Key</label>
+      <div class="password-wrap">
+        <input type="password" id="apiKey" placeholder="sk-..." />
+        <button class="toggle-pw" id="togglePw">👁</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>API 基础地址</label>
+      <input type="text" id="baseURL" placeholder="https://api.deepseek.com/v1" />
+      <div class="hint">如：https://api.deepseek.com/v1</div>
+    </div>
+    <div class="field">
+      <label>模型</label>
+      <input type="text" id="model" placeholder="deepseek-chat" />
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>对话参数</h2>
+    <hr class="divider">
+    <div class="slider-row">
+      <label>Temperature</label>
+      <input type="range" id="temperature" min="0" max="1" step="0.1" />
+      <span class="value" id="temperatureVal">0.7</span>
+    </div>
+    <div class="slider-row">
+      <label>最大回复长度</label>
+      <input type="range" id="maxTokens" min="100" max="4000" step="100" />
+      <span class="value" id="maxTokensVal">2000</span>
+    </div>
+    <div class="slider-row">
+      <label>历史条数</label>
+      <input type="range" id="historyMaxLength" min="5" max="50" step="5" />
+      <span class="value" id="historyMaxLengthVal">20</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>系统提示词</h2>
+    <hr class="divider">
+    <div class="field">
+      <textarea id="systemPrompt" rows="5"></textarea>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="testBtn">测试连接</button>
+    <button class="btn btn-secondary" id="saveBtn">保存</button>
+  </div>
+
+  <div class="alert" id="alert"></div>
+
+  <script>
+    // 加载配置
+    async function loadConfig() {
+      // @ts-ignore
+      var config = await window.companion.loadAIConfig();
+      if (!config) return;
+      document.getElementById('apiKey').value = config.apiKey || '';
+      document.getElementById('baseURL').value = config.baseURL || '';
+      document.getElementById('model').value = config.model || '';
+      document.getElementById('temperature').value = config.temperature || 0.7;
+      document.getElementById('temperatureVal').textContent = config.temperature || 0.7;
+      document.getElementById('maxTokens').value = config.maxTokens || 2000;
+      document.getElementById('maxTokensVal').textContent = config.maxTokens || 2000;
+      document.getElementById('historyMaxLength').value = config.historyMaxLength || 20;
+      document.getElementById('historyMaxLengthVal').textContent = config.historyMaxLength || 20;
+      document.getElementById('systemPrompt').value = config.systemPrompt || '';
+    }
+
+    // 滑块实时更新
+    ['temperature', 'maxTokens', 'historyMaxLength'].forEach(function(id) {
+      document.getElementById(id).addEventListener('input', function() {
+        document.getElementById(id + 'Val').textContent = this.value;
+      });
+    });
+
+    // 密码显示切换
+    document.getElementById('togglePw').addEventListener('click', function() {
+      var input = document.getElementById('apiKey');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+
+    // 测试连接
+    document.getElementById('testBtn').addEventListener('click', async function() {
+      var btn = this;
+      var alertEl = document.getElementById('alert');
+      btn.disabled = true;
+      btn.textContent = '测试中...';
+      alertEl.className = 'alert';
+      alertEl.style.display = 'none';
+
+      try {
+        // 先保存当前配置
+        saveConfig();
+
+        // @ts-ignore
+        var result = await window.companion.testAIConnection();
+        alertEl.textContent = result.message;
+        alertEl.className = 'alert ' + (result.success ? 'success' : 'error');
+      } catch (e) {
+        alertEl.textContent = '调用失败: ' + (e.message || e);
+        alertEl.className = 'alert error';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '测试连接';
+      }
+    });
+
+    // 保存配置
+    function saveConfig() {
+      var config = {
+        apiKey: document.getElementById('apiKey').value,
+        baseURL: document.getElementById('baseURL').value,
+        model: document.getElementById('model').value,
+        temperature: parseFloat(document.getElementById('temperature').value),
+        maxTokens: parseInt(document.getElementById('maxTokens').value),
+        historyMaxLength: parseInt(document.getElementById('historyMaxLength').value),
+        systemPrompt: document.getElementById('systemPrompt').value,
+      };
+      // @ts-ignore
+      window.companion.saveAIConfig(config);
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', function() {
+      try {
+        saveConfig();
+        var alertEl = document.getElementById('alert');
+        alertEl.textContent = '已保存！';
+        alertEl.className = 'alert success';
+        alertEl.style.display = 'block';
+        setTimeout(function() { alertEl.style.display = 'none'; }, 2000);
+      } catch (e) {
+        var alertEl = document.getElementById('alert');
+        alertEl.textContent = '保存失败: ' + (e.message || e);
+        alertEl.className = 'alert error';
+        alertEl.style.display = 'block';
+      }
+    });
+
+    // 初始化
+    loadConfig();
+  </script>
+</body>
+</html>

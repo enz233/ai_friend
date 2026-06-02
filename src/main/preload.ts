@@ -28,6 +28,21 @@ contextBridge.exposeInMainWorld('companion', {
   sendStateFinished: () => {
     ipcRenderer.send('state-finished');
   },
+  sendUserMessage: (text: string) => {
+    ipcRenderer.send('user-message', text);
+  },
+  openSettings: () => {
+    ipcRenderer.send('open-settings');
+  },
+  loadAIConfig: (): Promise<any> => {
+    return ipcRenderer.invoke('load-ai-config');
+  },
+  saveAIConfig: (config: any) => {
+    ipcRenderer.send('save-ai-config', config);
+  },
+  testAIConnection: (): Promise<any> => {
+    return ipcRenderer.invoke('test-ai-connection');
+  },
   onStateChanged: (callback: (event: any) => void) => {
     ipcRenderer.on('state-changed', (_event, data) => callback(data));
   },

@@ -139,6 +139,16 @@
   </div>
 
   <div class="section" style="margin-top: 24px;">
+    <h2>对话记忆</h2>
+    <hr class="divider">
+    <div class="hint" id="historyCount" style="margin-bottom: 4px;">历史消息：加载中...</div>
+    <div class="hint" id="memorySummary" style="margin-bottom: 8px; color: #666;">记忆摘要：加载中...</div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="clearHistoryBtn" style="background: #ffcdd2; color: #c62828;">清空历史和记忆</button>
+    </div>
+  </div>
+
+  <div class="section" style="margin-top: 24px;">
     <h2>日志</h2>
     <hr class="divider">
     <div class="hint" id="logPath" style="margin-bottom: 8px; word-break: break-all;"></div>
@@ -248,9 +258,34 @@
       window.companion.openLogFile();
     });
 
+    // 对话记忆
+    async function loadChatInfo() {
+      try {
+        // @ts-ignore
+        var info = await window.companion.getChatInfo();
+        document.getElementById('historyCount').textContent = '历史消息：' + info.historyCount + ' 条';
+        document.getElementById('memorySummary').textContent = '记忆摘要：' + (info.summary || '（暂无，累积50条对话后自动生成）');
+      } catch (e) {
+        document.getElementById('historyCount').textContent = '历史消息：加载失败';
+      }
+    }
+    document.getElementById('clearHistoryBtn').addEventListener('click', function() {
+      if (confirm('确定要清空所有对话历史和记忆吗？此操作不可撤销。')) {
+        // @ts-ignore
+        window.companion.clearChatHistory();
+        loadChatInfo();
+        var alertEl = document.getElementById('alert');
+        alertEl.textContent = '已清空对话历史和记忆';
+        alertEl.className = 'alert success';
+        alertEl.style.display = 'block';
+        setTimeout(function() { alertEl.style.display = 'none'; }, 2000);
+      }
+    });
+
     // 初始化
     loadConfig();
     loadLogPath();
+    loadChatInfo();
   </script>
 </body>
 </html>

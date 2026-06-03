@@ -217,6 +217,19 @@ function setupIPC(): void {
   ipcMain.on('open-log-file', () => {
     shell.openPath(getLogger().getLogPath());
   });
+
+  // 对话历史管理
+  ipcMain.on('clear-chat-history', () => {
+    chatManager?.clearHistory();
+    console.log('[Main] 对话历史已清空');
+  });
+
+  ipcMain.handle('get-chat-info', () => {
+    return {
+      historyCount: chatManager?.getHistoryCount() || 0,
+      summary: chatManager?.getSummary() || '',
+    };
+  });
 }
 
 function createSettingsWindow(): void {

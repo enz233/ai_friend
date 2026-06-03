@@ -1,0 +1,25 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好呀",
+      "timestamp": 1780486063310
+    },
+    {
+      "role": "assistant",
+      "content": "<item>你好呀~</item>\n<item>我刚刚在窗边看云呢，你来找我说话真开心</item>",
+      "timestamp": 1780486067457
+    },
+    {
+      "role": "user",
+      "content": "我也很开心",
+      "timestamp": 1780486076549
+    },
+    {
+      "role": "assistant",
+      "content": "<item>嗯~那就太好了</item>\n<item>你平时也喜欢安静地待着吗？</item>",
+      "timestamp": 1780486080630
+    }
+  ],
+  "sinceLastSummary": 4
+}

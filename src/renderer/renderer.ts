@@ -214,8 +214,9 @@
     var chatInput = document.getElementById('chat-input') as HTMLInputElement;
     if (!chatInput) return;
 
-    // 双击伙伴打开输入框
-    companionEl.addEventListener('dblclick', function (e) {
+    // 右键伙伴打开输入框
+    companionEl.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
       e.stopPropagation();
       chatInput.classList.remove('hidden');
       chatInput.focus();

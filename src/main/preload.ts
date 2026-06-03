@@ -52,6 +52,12 @@ contextBridge.exposeInMainWorld('companion', {
   openLogFile: () => {
     ipcRenderer.send('open-log-file');
   },
+  clearChatHistory: () => {
+    ipcRenderer.send('clear-chat-history');
+  },
+  getChatInfo: (): Promise<any> => {
+    return ipcRenderer.invoke('get-chat-info');
+  },
   onStateChanged: (callback: (event: any) => void) => {
     ipcRenderer.on('state-changed', (_event, data) => callback(data));
   },

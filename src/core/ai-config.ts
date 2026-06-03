@@ -69,4 +69,8 @@ export class AIConfigManager {
   isValid(): boolean {
     return Boolean(this.config.apiKey && this.config.baseURL && this.config.model);
   }
+
+  getConfigDir(): string {
+    return path.dirname(this.configPath);
+  }
 }

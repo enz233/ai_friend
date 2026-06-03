@@ -1,18 +1,20 @@
 import { BrowserWindow } from 'electron';
 import { AIConfigManager } from './ai-config';
 import { AIService, ChatMessage } from './ai-service';
+import { AIMemory } from './ai-memory';
 
 export class ChatManager {
   private aiService: AIService;
   private configManager: AIConfigManager;
+  private memory: AIMemory;
   private mainWindow: BrowserWindow;
-  private history: ChatMessage[] = [];
   private isProcessing = false;
 
   constructor(mainWindow: BrowserWindow, configManager: AIConfigManager, aiService: AIService) {
     this.mainWindow = mainWindow;
     this.configManager = configManager;
     this.aiService = aiService;
+    this.memory = new AIMemory(configManager.getConfigDir());
   }
 
   /** 发送用户消息并获取 AI 回复 */
@@ -31,41 +33,30 @@ export class ChatManager {
     this.sendBubble('思考中...');
 
     try {
-      // 构建消息数组
+      // 保存用户消息到历史
+      this.memory.addMessage('user', userMessage);
+
+      // 构建消息数组（含记忆）
       const config = this.configManager.get();
-      const systemPrompt = config.systemPrompt + '\n\n' + RESPONSE_FORMAT_PROMPT;
+      const systemPrompt = this.memory.buildSystemPrompt(config.systemPrompt, RESPONSE_FORMAT_PROMPT);
       const messages: ChatMessage[] = [
         { role: 'system', content: systemPrompt },
-        ...this.getRecentHistory(),
+        ...this.memory.getRecentMessages(config.historyMaxLength),
         { role: 'user', content: userMessage },
       ];
 
       // 流式调用
-      let buffer = '';
-      const items: string[] = [];
-
-      const fullResponse = await this.aiService.chatStream(messages, (chunk, total) => {
-        buffer = total;
-        // 解析完整的 <item> 标签
-        const regex = /<item>(.*?)<\/item>/g;
-        let match;
-        while ((match = regex.exec(total)) !== null) {
-          const itemText = match[1].trim();
-          if (itemText && !items.includes(itemText)) {
-            items.push(itemText);
-          }
-        }
+      const fullResponse = await this.aiService.chatStream(messages, (_chunk, _total) => {
+        // 流式回调（目前不处理中间结果）
       });
 
-      // 解析最终响应
-      const parsedItems = this.parseResponse(fullResponse || buffer);
+      // 解析响应
+      const parsedItems = this.parseResponse(fullResponse);
 
       if (parsedItems.length === 0) {
-        // 如果没有解析到 item，直接显示原始文本
-        const rawText = fullResponse || buffer || '...';
+        const rawText = fullResponse || '...';
         this.sendBubble(rawText.slice(0, 100));
       } else {
-        // 逐条显示
         for (let i = 0; i < parsedItems.length; i++) {
           if (i > 0) {
             await this.delay(1500 + Math.random() * 1000);
@@ -74,14 +65,12 @@ export class ChatManager {
         }
       }
 
-      // 保存到历史
-      this.history.push({ role: 'user', content: userMessage });
-      this.history.push({ role: 'assistant', content: fullResponse || buffer });
+      // 保存 AI 回复到历史
+      this.memory.addMessage('assistant', fullResponse);
 
-      // 限制历史长度
-      const maxLength = config.historyMaxLength * 2; // 每轮对话 = user + assistant
-      while (this.history.length > maxLength) {
-        this.history.shift();
+      // 检查是否需要生成摘要（后台异步，不阻塞）
+      if (this.memory.shouldSummarize()) {
+        this.summarizeAsync();
       }
 
     } catch (error: any) {
@@ -89,6 +78,22 @@ export class ChatManager {
       this.sendBubble('出错了... ' + (error.message || ''));
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  /** 后台异步生成摘要 */
+  private async summarizeAsync(): Promise<void> {
+    try {
+      console.log('[ChatManager] 开始生成记忆摘要...');
+      const summaryMessages = this.memory.buildSummaryMessages();
+      const newSummary = await this.aiService.chat(summaryMessages);
+      if (newSummary && newSummary.trim()) {
+        this.memory.applySummary(newSummary);
+        console.log('[ChatManager] 记忆摘要已更新');
+      }
+    } catch (error: any) {
+      console.error('[ChatManager] 摘要生成失败:', error.message);
+      // 不重置 sinceLastSummary，下次再试
     }
   }
 
@@ -106,12 +111,6 @@ export class ChatManager {
     return items;
   }
 
-  /** 获取最近的对话历史 */
-  private getRecentHistory(): ChatMessage[] {
-    const maxLength = this.configManager.get().historyMaxLength * 2;
-    return this.history.slice(-maxLength);
-  }
-
   /** 发送气泡到渲染进程 */
   private sendBubble(text: string): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -124,9 +123,19 @@ export class ChatManager {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /** 清空历史 */
+  /** 清空历史和记忆 */
   clearHistory(): void {
-    this.history = [];
+    this.memory.clearAll();
+  }
+
+  /** 获取历史条数 */
+  getHistoryCount(): number {
+    return this.memory.getHistoryCount();
+  }
+
+  /** 获取记忆摘要 */
+  getSummary(): string {
+    return this.memory.getSummary();
   }
 }
 

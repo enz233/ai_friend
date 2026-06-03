@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
 import * as path from 'path';
 import { StateManager } from '../core/state-manager';
 import { TimeAwareness } from '../core/time-awareness';
@@ -7,8 +7,10 @@ import { BubbleManager } from '../core/bubble-manager';
 import { AIConfigManager } from '../core/ai-config';
 import { AIService } from '../core/ai-service';
 import { ChatManager } from '../core/chat-manager';
+import { getLogger } from '../core/logger';
 
 let mainWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
 let stateManager: StateManager;
 let timeAwareness: TimeAwareness;
 let transitionEngine: TransitionEngine;
@@ -107,7 +109,10 @@ function createWindow(): void {
     }
   }, 500);
 
-  // IPC 处理：接收渲染进程的交互事件
+}
+
+/** 注册所有 IPC 监听器（只调用一次） */
+function setupIPC(): void {
   ipcMain.on('cursor-move', (_event, data: { x: number; y: number }) => {
     if (!mainWindow || !transitionEngine) return;
     const bounds = mainWindow.getBounds();
@@ -118,8 +123,6 @@ function createWindow(): void {
   ipcMain.on('drag-start', () => {
     transitionEngine?.handleDragStart();
     if (!mainWindow || mainWindow.isDestroyed()) return;
-
-    // 记录鼠标与窗口的偏移量
     const cursor = screen.getCursorScreenPoint();
     const [winX, winY] = mainWindow.getPosition();
     dragOffsetX = cursor.x - winX;
@@ -127,8 +130,6 @@ function createWindow(): void {
     lastCursorX = cursor.x;
     lastCursorY = cursor.y;
     isDragging = true;
-
-    // 开始轮询鼠标位置，每帧更新窗口位置
     if (dragPollTimer) clearInterval(dragPollTimer);
     dragPollTimer = setInterval(() => {
       if (!isDragging || !mainWindow || mainWindow.isDestroyed()) {
@@ -136,13 +137,12 @@ function createWindow(): void {
         return;
       }
       const pos = screen.getCursorScreenPoint();
-      // 只在鼠标实际移动时才更新窗口，避免微小抖动导致漂移
       if (pos.x !== lastCursorX || pos.y !== lastCursorY) {
         lastCursorX = pos.x;
         lastCursorY = pos.y;
         mainWindow.setPosition(pos.x - dragOffsetX, pos.y - dragOffsetY);
       }
-    }, 16); // ~60fps
+    }, 16);
   });
 
   ipcMain.on('drag-end', () => {
@@ -163,28 +163,24 @@ function createWindow(): void {
     transitionEngine?.handleStateFinished();
   });
 
-  // 相对移动窗口（拖拽时由主进程轮询处理，这里保留给其他用途）
   ipcMain.on('window-move-by', (_event, data: { deltaX: number; deltaY: number }) => {
     if (!mainWindow || mainWindow.isDestroyed() || isDragging) return;
     const [x, y] = mainWindow.getPosition();
     mainWindow.setPosition(x + data.deltaX, y + data.deltaY);
   });
 
-  // 鼠标进入角色区域 → 恢复交互
   ipcMain.on('mouse-enter', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setIgnoreMouseEvents(false);
     }
   });
 
-  // 鼠标离开角色区域 → 穿透点击
   ipcMain.on('mouse-leave', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setIgnoreMouseEvents(true, { forward: true });
     }
   });
 
-  // AI 相关 IPC
   ipcMain.on('user-message', (_event, text: string) => {
     chatManager?.sendMessage(text);
   });
@@ -194,33 +190,41 @@ function createWindow(): void {
   });
 
   ipcMain.handle('load-ai-config', () => {
-    console.log('[AI] 加载配置');
-    const config = aiConfigManager?.get();
-    console.log('[AI] 配置:', config ? '已加载' : '未找到');
-    return config;
+    return aiConfigManager?.get();
   });
 
   ipcMain.on('save-ai-config', (_event, config: any) => {
-    console.log('[AI] 保存配置');
     aiConfigManager?.update(config);
-    console.log('[AI] 配置已保存');
   });
 
   ipcMain.handle('test-ai-connection', async () => {
-    console.log('[AI] 测试连接');
-    try {
-      const result = await aiService?.testConnection();
-      console.log('[AI] 测试结果:', result);
-      return result;
-    } catch (e: any) {
-      console.error('[AI] 测试失败:', e);
-      return { success: false, message: '测试失败: ' + e.message };
-    }
+    return await aiService?.testConnection();
+  });
+
+  // 日志相关
+  ipcMain.on('renderer-log', (_event, level: string, message: string) => {
+    getLogger().debug('Renderer', `[${level}] ${message}`);
+  });
+
+  ipcMain.handle('get-log-path', () => {
+    return getLogger().getLogPath();
+  });
+
+  ipcMain.handle('get-recent-logs', (_event, count: number) => {
+    return getLogger().getRecentLines(count);
+  });
+
+  ipcMain.on('open-log-file', () => {
+    shell.openPath(getLogger().getLogPath());
   });
 }
 
 function createSettingsWindow(): void {
-  const settingsWindow = new BrowserWindow({
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
     width: 500,
     height: 600,
     title: '设置',
@@ -232,6 +236,7 @@ function createSettingsWindow(): void {
     },
   });
   settingsWindow.loadFile(path.join(__dirname, '..', '..', 'src', 'main', 'settings.html'));
+  settingsWindow.on('closed', () => { settingsWindow = null; });
 }
 
 function stopDragPoll(): void {
@@ -241,6 +246,7 @@ function stopDragPoll(): void {
   }
 }
 
+setupIPC();
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {

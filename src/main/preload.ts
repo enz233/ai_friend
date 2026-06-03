@@ -43,6 +43,15 @@ contextBridge.exposeInMainWorld('companion', {
   testAIConnection: (): Promise<any> => {
     return ipcRenderer.invoke('test-ai-connection');
   },
+  log: (level: string, message: string) => {
+    ipcRenderer.send('renderer-log', level, message);
+  },
+  getLogPath: (): Promise<string> => {
+    return ipcRenderer.invoke('get-log-path');
+  },
+  openLogFile: () => {
+    ipcRenderer.send('open-log-file');
+  },
   onStateChanged: (callback: (event: any) => void) => {
     ipcRenderer.on('state-changed', (_event, data) => callback(data));
   },

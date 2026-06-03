@@ -57,11 +57,27 @@ export class BubbleManager {
     }
   }
 
-  /** 获取前台窗口标题（Windows PowerShell） */
+  /** 获取前台窗口标题（Windows） */
   private getActiveWindowTitle(): Promise<string> {
     return new Promise((resolve) => {
-      const cmd = 'powershell -NoProfile -Command "(Get-Process | Where-Object {$_.MainWindowTitle -ne \'\'})[0].MainWindowTitle"';
-      exec(cmd, { timeout: 3000 }, (error, stdout) => {
+      // 使用 encoded command 避免引号嵌套问题
+      const script = [
+        'Add-Type -TypeDefinition @"',
+        'using System;',
+        'using System.Runtime.InteropServices;',
+        'using System.Text;',
+        'public class Win32 {',
+        '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+        '  [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);',
+        '}',
+        '"@',
+        '$h = [Win32]::GetForegroundWindow()',
+        '$sb = New-Object System.Text.StringBuilder 256',
+        '[Win32]::GetWindowText($h, $sb, 256) | Out-Null',
+        '$sb.ToString()',
+      ].join('; ');
+      const encoded = Buffer.from(script, 'utf16le').toString('base64');
+      exec(`powershell -NoProfile -EncodedCommand ${encoded}`, { timeout: 5000 }, (error, stdout) => {
         if (error) {
           resolve('');
           return;

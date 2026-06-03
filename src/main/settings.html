@@ -138,6 +138,15 @@
     <button class="btn btn-secondary" id="saveBtn">保存</button>
   </div>
 
+  <div class="section" style="margin-top: 24px;">
+    <h2>日志</h2>
+    <hr class="divider">
+    <div class="hint" id="logPath" style="margin-bottom: 8px; word-break: break-all;"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="openLogBtn">打开日志文件</button>
+    </div>
+  </div>
+
   <div class="alert" id="alert"></div>
 
   <script>
@@ -228,8 +237,20 @@
       }
     });
 
+    // 日志
+    async function loadLogPath() {
+      // @ts-ignore
+      var logPath = await window.companion.getLogPath();
+      document.getElementById('logPath').textContent = '日志路径: ' + logPath;
+    }
+    document.getElementById('openLogBtn').addEventListener('click', function() {
+      // @ts-ignore
+      window.companion.openLogFile();
+    });
+
     // 初始化
     loadConfig();
+    loadLogPath();
   </script>
 </body>
 </html>

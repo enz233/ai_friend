@@ -1,6 +1,35 @@
 // 渲染进程 - 管理伙伴的视觉表现（纯浏览器脚本，无模块语法）
 
 (function () {
+  // 日志转发到主进程
+  var _origLog = console.log;
+  var _origWarn = console.warn;
+  var _origError = console.error;
+  function serializeArgs(args: any[]): string {
+    return args.map(function (a) {
+      if (typeof a === 'object' && a !== null) {
+        try { return JSON.stringify(a); } catch (e) { return String(a); }
+      }
+      return String(a);
+    }).join(' ');
+  }
+
+  console.log = function (...args: any[]) {
+    // @ts-ignore
+    window.companion.log('LOG', serializeArgs(args));
+    _origLog(...args);
+  };
+  console.warn = function (...args: any[]) {
+    // @ts-ignore
+    window.companion.log('WARN', serializeArgs(args));
+    _origWarn(...args);
+  };
+  console.error = function (...args: any[]) {
+    // @ts-ignore
+    window.companion.log('ERROR', serializeArgs(args));
+    _origError(...args);
+  };
+
   var SPRITE_DIR = '';
 
   var currentState = 'idle';
@@ -276,7 +305,7 @@
 
   function stopSleepAnim(): void {
     if (sleepAnimTimer) {
-      clearInterval(sleepAnimTimer);
+      clearTimeout(sleepAnimTimer);
       sleepAnimTimer = null;
     }
   }

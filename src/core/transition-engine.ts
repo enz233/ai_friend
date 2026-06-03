@@ -25,13 +25,16 @@ export class TransitionEngine {
     this.timeAwareness = timeAwareness;
     this.config = stateManager.getConfig();
 
-    // 监听状态变化：离开 curious 或 dragged 时重置 isCursorNear
+    // 监听状态变化：离开 curious 或 dragged 时重置 isCursorNear，离开 lonely 时重置 isLonelyAction
     this.stateManager.onStateChange((event) => {
       if (event.from === 'curious' && event.to !== 'curious') {
         this.isCursorNear = false;
       }
       if (event.from === 'dragged' && event.to !== 'dragged') {
         this.isCursorNear = false;
+      }
+      if (event.from === 'lonely' && event.to !== 'lonely') {
+        this.isLonelyAction = false;
       }
     });
   }

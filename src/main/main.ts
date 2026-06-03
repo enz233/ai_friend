@@ -86,6 +86,8 @@ function createWindow(): void {
   // 延迟发送问候语（等渲染进程就绪）
   setTimeout(() => {
     bubbleManager.showGreeting();
+    // AI 问候（延迟等固定问候显示完）
+    chatManager?.sendGreeting();
   }, 1500);
   // 启动活动监视（每45秒检测一次）
   bubbleManager.startActivityMonitor(45000);

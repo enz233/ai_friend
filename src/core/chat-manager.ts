@@ -128,6 +128,42 @@ export class ChatManager {
     }
   }
 
+  /** 发送 AI 问候（启动时调用） */
+  async sendGreeting(): Promise<void> {
+    if (!this.configManager.isValid()) return;
+
+    try {
+      const now = new Date();
+      const timeStr = now.toLocaleString('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+      const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+
+      const config = this.configManager.get();
+      const systemPrompt = this.memory.buildSystemPrompt(config.systemPrompt, RESPONSE_FORMAT_PROMPT);
+      const memoryContext = this.memory.getSummary()
+        ? '\n\n关于用户的一些了解：' + this.memory.getSummary()
+        : '';
+
+      const messages: ChatMessage[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'system', content: `现在是${timeStr}，星期${dayOfWeek}。${memoryContext}\n请用简短的一句话和用户打招呼，要自然可爱，不要重复固定问候语。不要用<item>标签，直接输出文字。` },
+        { role: 'user', content: '（用户刚刚打开了你）' },
+      ];
+
+      const response = await this.aiService.chat(messages);
+      if (response && response.trim()) {
+        // 延迟一下，等固定问候显示完
+        await this.delay(3000);
+        this.sendBubble(response.trim().slice(0, 50));
+      }
+    } catch (error: any) {
+      console.error('[ChatManager] AI 问候失败:', error.message);
+      // 静默失败，不影响使用
+    }
+  }
+
   /** 解析 AI 响应中的 <item> 标签 */
   private parseResponse(text: string): string[] {
     const items: string[] = [];

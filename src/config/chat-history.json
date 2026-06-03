@@ -109,7 +109,17 @@
       "role": "assistant",
       "content": "<item>晚上好呀~</item>\n<item>你听，窗外的蟋蟀在开音乐会呢</item>\n<item>我猜它们一定是在唱一首关于月亮的歌</item>",
       "timestamp": 1780490477725
+    },
+    {
+      "role": "user",
+      "content": "www",
+      "timestamp": 1780490893373
+    },
+    {
+      "role": "assistant",
+      "content": "<item>www...这个声音让我想起你像一个小团子一样蜷缩着</item>\n<item>是不是有点困啦？窗外的月亮都圆圆的，像在说晚安呢</item>",
+      "timestamp": 1780490897787
     }
   ],
-  "sinceLastSummary": 22
+  "sinceLastSummary": 24
 }

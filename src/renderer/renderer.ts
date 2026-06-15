@@ -298,21 +298,24 @@
     // TTS 语音播放（附带字幕）
     // @ts-ignore
     window.companion.onTtsPlay(function (base64: string, text: string) {
-      // 显示字幕气泡
+      // 显示字幕（不自动隐藏，等音频结束）
       if (text) {
-        showBubble(text);
+        showSubtitle(text);
       }
       var audioSrc = 'data:audio/wav;base64,' + base64;
       var audio = new Audio(audioSrc);
       audio.onended = function () {
+        hideSubtitle();
         // @ts-ignore
         window.companion.sendTtsPlaybackDone();
       };
       audio.onerror = function () {
+        hideSubtitle();
         // @ts-ignore
         window.companion.sendTtsPlaybackDone();
       };
       audio.play().catch(function () {
+        hideSubtitle();
         // @ts-ignore
         window.companion.sendTtsPlaybackDone();
       });
@@ -759,6 +762,24 @@
       bubbleEl.classList.remove('visible');
       setTimeout(function () { bubbleEl.classList.add('hidden'); }, 500);
     }, 3000);
+  }
+
+  /** 显示字幕（不自动隐藏，等 hideSubtitle 调用） */
+  function showSubtitle(text: string): void {
+    if (bubbleTimeout) {
+      clearTimeout(bubbleTimeout);
+      bubbleTimeout = null;
+    }
+    updateBubblePosition();
+    bubbleEl.textContent = text;
+    bubbleEl.classList.remove('hidden');
+    bubbleEl.classList.add('visible');
+  }
+
+  /** 隐藏字幕 */
+  function hideSubtitle(): void {
+    bubbleEl.classList.remove('visible');
+    setTimeout(function () { bubbleEl.classList.add('hidden'); }, 300);
   }
 
   function scheduleNextBlink(): void {

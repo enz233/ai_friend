@@ -117,7 +117,8 @@ function createWindow(): void {
   // 连接情绪系统到 TransitionEngine
   transitionEngine.setEmotionUpdater(chatManager.getEmotionUpdater());
 
-  // 连接 TTS 到 ChatManager
+  // 连接 TTS 到 ChatManager，并提供 AI 服务用于翻译
+  ttsManager.setAIService(aiService);
   chatManager.setTTSManager(ttsManager);
 
   // 定时发送当前状态给渲染进程（用于UI更新）

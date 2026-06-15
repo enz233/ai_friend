@@ -2,11 +2,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 
-export type TTSMode = 'gpt-sovits' | 'api' | 'mimo';
+export type TTSMode = 'gpt-sovits' | 'api' | 'mimo' | 'aliyun';
+export type TTSLanguage = 'zh' | 'en' | 'ja';
 
 export interface TTSConfig {
   on: boolean;
   mode: TTSMode;
+  ttsLanguage: TTSLanguage;       // TTS 语音语言
+  subtitleLanguage: TTSLanguage;   // 字幕显示语言（可独立于 TTS）
   // GPT-SoVITS
   gptSovitsURL: string;
   gptSovitsTextLang: string;
@@ -22,11 +25,19 @@ export interface TTSConfig {
   mimoModel: string;
   mimoVoice: string;
   mimoVoiceDesign: string;
+  // 阿里云百炼 TTS
+  aliyunApiKey: string;
+  aliyunBaseURL: string;
+  aliyunModel: string;
+  aliyunVoice: string;
+  aliyunLanguage: string;
 }
 
 const DEFAULT_CONFIG: TTSConfig = {
   on: false,
   mode: 'gpt-sovits',
+  ttsLanguage: 'zh',
+  subtitleLanguage: 'zh',
   gptSovitsURL: 'http://127.0.0.1:9880',
   gptSovitsTextLang: 'zh',
   ttsApiKey: '',
@@ -39,6 +50,11 @@ const DEFAULT_CONFIG: TTSConfig = {
   mimoModel: 'mimo-v2.5-tts',
   mimoVoice: '冰糖',
   mimoVoiceDesign: '温柔可爱的少女声音，说话轻声细语',
+  aliyunApiKey: '',
+  aliyunBaseURL: 'https://dashscope.aliyuncs.com',
+  aliyunModel: 'qwen3-tts-flash',
+  aliyunVoice: 'Cherry',
+  aliyunLanguage: 'auto',
 };
 
 export class TTSConfigManager {

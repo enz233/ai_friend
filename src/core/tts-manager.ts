@@ -6,20 +6,28 @@
  */
 
 import { BrowserWindow } from 'electron';
-import { TTSConfigManager, TTSConfig } from './tts-config';
+import { TTSConfigManager, TTSConfig, TTSLanguage } from './tts-config';
 import { TTSGptSoVits } from './tts-gpt-sovits';
 import { TTSApi } from './tts-api';
 import { TTSMiMo } from './tts-mimo';
+import { TTSAliyun } from './tts-aliyun';
+import { AIService, ChatMessage } from './ai-service';
 
 export class TTSManager {
   private configManager: TTSConfigManager;
   private mainWindow: BrowserWindow;
+  private aiService: AIService | null = null;
   private isSpeaking = false;
   private queue: string[] = [];
 
   constructor(mainWindow: BrowserWindow, configManager: TTSConfigManager) {
     this.mainWindow = mainWindow;
     this.configManager = configManager;
+  }
+
+  /** 设置 AI 服务（用于翻译） */
+  setAIService(aiService: AIService): void {
+    this.aiService = aiService;
   }
 
   /** 合成并播放语音 */
@@ -36,9 +44,21 @@ export class TTSManager {
     this.isSpeaking = true;
 
     try {
-      const audioData = await this.synthesize(text, config);
+      // 翻译：将文本翻译为 TTS 目标语言
+      let ttsText = text;
+      if (config.ttsLanguage !== 'zh' && this.aiService) {
+        ttsText = await this.translate(text, config.ttsLanguage);
+      }
+
+      // 翻译字幕：将文本翻译为字幕语言
+      let subtitleText = text;
+      if (config.subtitleLanguage !== 'zh' && this.aiService) {
+        subtitleText = await this.translate(text, config.subtitleLanguage);
+      }
+
+      const audioData = await this.synthesize(ttsText, config);
       if (audioData) {
-        await this.play(audioData, text);
+        await this.play(audioData, subtitleText);
       }
     } catch (error: any) {
       console.error('[TTS] 语音合成失败:', error.message);
@@ -53,6 +73,33 @@ export class TTSManager {
     }
   }
 
+  /** 调用 AI 翻译文本 */
+  private async translate(text: string, targetLang: TTSLanguage): Promise<string> {
+    if (!this.aiService) return text;
+
+    const langNames: Record<TTSLanguage, string> = {
+      zh: '中文',
+      en: 'English',
+      ja: '日本語',
+    };
+
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: `你是一个翻译助手。将用户的消息翻译成${langNames[targetLang]}。只输出翻译结果，不要加任何解释或额外内容。`,
+      },
+      { role: 'user', content: text },
+    ];
+
+    try {
+      const result = await this.aiService.chat(messages);
+      return result || text;
+    } catch (error: any) {
+      console.error('[TTS] 翻译失败:', error.message);
+      return text; // 翻译失败则使用原文
+    }
+  }
+
   /** 根据配置选择引擎并合成 */
   private async synthesize(text: string, config: TTSConfig): Promise<ArrayBuffer | null> {
     try {
@@ -61,6 +108,9 @@ export class TTSManager {
         return await engine.synthesize(text);
       } else if (config.mode === 'mimo') {
         const engine = new TTSMiMo(config);
+        return await engine.synthesize(text);
+      } else if (config.mode === 'aliyun') {
+        const engine = new TTSAliyun(config);
         return await engine.synthesize(text);
       } else {
         const engine = new TTSApi(config);
@@ -122,6 +172,9 @@ export class TTSManager {
         ok = await engine.test();
       } else if (config.mode === 'mimo') {
         const engine = new TTSMiMo(config);
+        ok = await engine.test();
+      } else if (config.mode === 'aliyun') {
+        const engine = new TTSAliyun(config);
         ok = await engine.test();
       } else {
         const engine = new TTSApi(config);

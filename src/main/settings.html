@@ -282,11 +282,30 @@
         </label>
       </div>
       <div class="field">
+        <label>语音语言</label>
+        <select id="ttsLanguage">
+          <option value="zh">中文</option>
+          <option value="en">英语</option>
+          <option value="ja">日语</option>
+        </select>
+        <div class="hint">AI回复会先翻译成对应语言再合成语音</div>
+      </div>
+      <div class="field">
+        <label>字幕语言</label>
+        <select id="subtitleLanguage">
+          <option value="zh">中文</option>
+          <option value="en">英语</option>
+          <option value="ja">日语</option>
+        </select>
+        <div class="hint">字幕显示的语言（可独立于语音语言）</div>
+      </div>
+      <div class="field">
         <label>TTS 模式</label>
         <select id="ttsMode">
           <option value="gpt-sovits">GPT-SoVITS（本地模型）</option>
           <option value="api">外部 TTS API</option>
           <option value="mimo">小米 MiMo TTS</option>
+          <option value="aliyun">阿里云百炼 TTS</option>
         </select>
       </div>
 
@@ -380,6 +399,57 @@
         </div>
       </div>
 
+      <div id="aliyunSection" style="display: none;">
+        <h2 style="margin-top: 16px;">阿里云百炼 TTS 配置</h2>
+        <hr class="divider">
+        <div class="field">
+          <label>API Key</label>
+          <div class="password-wrap">
+            <input type="password" id="aliyunApiKey" placeholder="阿里云百炼 API Key" />
+            <button class="toggle-pw" id="toggleAliyunPw">👁</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>API 地址</label>
+          <input type="text" id="aliyunBaseURL" placeholder="https://dashscope.aliyuncs.com" />
+        </div>
+        <div class="field">
+          <label>模型</label>
+          <select id="aliyunModel">
+            <option value="qwen3-tts-flash">qwen3-tts-flash</option>
+            <option value="qwen3-tts-instruct-flash">qwen3-tts-instruct-flash（指令控制）</option>
+            <option value="_custom">自定义...</option>
+          </select>
+        </div>
+        <div class="field" id="aliyunCustomModelField" style="display: none;">
+          <label>自定义模型名</label>
+          <input type="text" id="aliyunCustomModel" placeholder="输入模型名称" />
+        </div>
+        <div class="field">
+          <label>音色</label>
+          <select id="aliyunVoice">
+            <option value="Cherry">Cherry（中文女声）</option>
+            <option value="Ethan">Ethan（中文男声）</option>
+            <option value="Serena">Serena（英文女声）</option>
+            <option value="Caleb">Caleb（英文男声）</option>
+            <option value="_custom">自定义...</option>
+          </select>
+        </div>
+        <div class="field" id="aliyunCustomVoiceField" style="display: none;">
+          <label>自定义音色名</label>
+          <input type="text" id="aliyunCustomVoice" placeholder="输入音色名称" />
+        </div>
+        <div class="field">
+          <label>语言</label>
+          <select id="aliyunLanguage">
+            <option value="auto">自动检测</option>
+            <option value="Chinese">中文</option>
+            <option value="English">英语</option>
+            <option value="Japanese">日语</option>
+          </select>
+        </div>
+      </div>
+
       <div class="btn-row">
         <button class="btn btn-primary" id="saveTtsBtn">保存</button>
         <button class="btn btn-secondary" id="testTtsBtn">测试语音</button>
@@ -464,6 +534,8 @@
       var config = await window.companion.loadTTSConfig();
       if (!config) return;
       document.getElementById('ttsOn').checked = config.on ?? false;
+      document.getElementById('ttsLanguage').value = config.ttsLanguage || 'zh';
+      document.getElementById('subtitleLanguage').value = config.subtitleLanguage || 'zh';
       document.getElementById('ttsMode').value = config.mode || 'gpt-sovits';
       document.getElementById('gptSovitsURL').value = config.gptSovitsURL || 'http://127.0.0.1:9880';
       document.getElementById('gptSovitsTextLang').value = config.gptSovitsTextLang || 'zh';
@@ -479,6 +551,30 @@
       document.getElementById('mimoModel').value = config.mimoModel || 'mimo-v2.5-tts';
       document.getElementById('mimoVoice').value = config.mimoVoice || '冰糖';
       document.getElementById('mimoVoiceDesign').value = config.mimoVoiceDesign || '温柔可爱的少女声音，说话轻声细语';
+      // 阿里云
+      document.getElementById('aliyunApiKey').value = config.aliyunApiKey || '';
+      document.getElementById('aliyunBaseURL').value = config.aliyunBaseURL || 'https://dashscope.aliyuncs.com';
+      var aliyunModel = config.aliyunModel || 'qwen3-tts-flash';
+      var modelSelect = document.getElementById('aliyunModel');
+      var modelOption = modelSelect.querySelector('option[value="' + aliyunModel + '"]');
+      if (modelOption) {
+        modelSelect.value = aliyunModel;
+      } else {
+        modelSelect.value = '_custom';
+        document.getElementById('aliyunCustomModel').value = aliyunModel;
+        document.getElementById('aliyunCustomModelField').style.display = 'block';
+      }
+      var aliyunVoice = config.aliyunVoice || 'Cherry';
+      var voiceSelect = document.getElementById('aliyunVoice');
+      var voiceOption = voiceSelect.querySelector('option[value="' + aliyunVoice + '"]');
+      if (voiceOption) {
+        voiceSelect.value = aliyunVoice;
+      } else {
+        voiceSelect.value = '_custom';
+        document.getElementById('aliyunCustomVoice').value = aliyunVoice;
+        document.getElementById('aliyunCustomVoiceField').style.display = 'block';
+      }
+      document.getElementById('aliyunLanguage').value = config.aliyunLanguage || 'auto';
       toggleTtsSections();
     }
 
@@ -521,6 +617,8 @@
     function saveTTSConfig() {
       var config = {
         on: document.getElementById('ttsOn').checked,
+        ttsLanguage: document.getElementById('ttsLanguage').value,
+        subtitleLanguage: document.getElementById('subtitleLanguage').value,
         mode: document.getElementById('ttsMode').value,
         gptSovitsURL: document.getElementById('gptSovitsURL').value,
         gptSovitsTextLang: document.getElementById('gptSovitsTextLang').value,
@@ -534,6 +632,15 @@
         mimoModel: document.getElementById('mimoModel').value,
         mimoVoice: document.getElementById('mimoVoice').value,
         mimoVoiceDesign: document.getElementById('mimoVoiceDesign').value,
+        aliyunApiKey: document.getElementById('aliyunApiKey').value,
+        aliyunBaseURL: document.getElementById('aliyunBaseURL').value,
+        aliyunModel: document.getElementById('aliyunModel').value === '_custom'
+          ? document.getElementById('aliyunCustomModel').value
+          : document.getElementById('aliyunModel').value,
+        aliyunVoice: document.getElementById('aliyunVoice').value === '_custom'
+          ? document.getElementById('aliyunCustomVoice').value
+          : document.getElementById('aliyunVoice').value,
+        aliyunLanguage: document.getElementById('aliyunLanguage').value,
       };
       // @ts-ignore
       window.companion.saveTTSConfig(config);
@@ -544,6 +651,7 @@
       document.getElementById('sovitsSection').style.display = mode === 'gpt-sovits' ? 'block' : 'none';
       document.getElementById('apiSection').style.display = mode === 'api' ? 'block' : 'none';
       document.getElementById('mimoSection').style.display = mode === 'mimo' ? 'block' : 'none';
+      document.getElementById('aliyunSection').style.display = mode === 'aliyun' ? 'block' : 'none';
     }
 
     // ========== 滑块实时更新 ==========
@@ -689,6 +797,9 @@
     document.getElementById('ttsSpeed').addEventListener('input', function() {
       document.getElementById('ttsSpeedVal').textContent = parseFloat(this.value).toFixed(1);
     });
+    document.getElementById('aliyunSpeechRate').addEventListener('input', function() {
+      document.getElementById('aliyunSpeechRateVal').textContent = parseFloat(this.value).toFixed(1);
+    });
 
     // TTS 密码切换
     document.getElementById('toggleTtsPw').addEventListener('click', function() {
@@ -698,6 +809,18 @@
     document.getElementById('toggleMimoPw').addEventListener('click', function() {
       var input = document.getElementById('mimoApiKey');
       input.type = input.type === 'password' ? 'text' : 'password';
+    });
+    document.getElementById('toggleAliyunPw').addEventListener('click', function() {
+      var input = document.getElementById('aliyunApiKey');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+    document.getElementById('aliyunVoice').addEventListener('change', function() {
+      var show = this.value === '_custom';
+      document.getElementById('aliyunCustomVoiceField').style.display = show ? 'block' : 'none';
+    });
+    document.getElementById('aliyunModel').addEventListener('change', function() {
+      var show = this.value === '_custom';
+      document.getElementById('aliyunCustomModelField').style.display = show ? 'block' : 'none';
     });
 
     // 保存 TTS 配置

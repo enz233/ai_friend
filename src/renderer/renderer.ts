@@ -294,6 +294,31 @@
       companionEl.style.width = size + 'px';
       companionEl.style.height = size + 'px';
     });
+
+    // TTS 语音播放
+    // @ts-ignore
+    window.companion.onTtsPlay(function (base64: string) {
+      var audioSrc = 'data:audio/wav;base64,' + base64;
+      var audio = new Audio(audioSrc);
+      audio.onended = function () {
+        // @ts-ignore
+        window.companion.sendTtsPlaybackDone();
+      };
+      audio.onerror = function () {
+        // @ts-ignore
+        window.companion.sendTtsPlaybackDone();
+      };
+      audio.play().catch(function () {
+        // @ts-ignore
+        window.companion.sendTtsPlaybackDone();
+      });
+    });
+
+    // @ts-ignore
+    window.companion.onTtsStop(function () {
+      // 停止所有音频播放（简单实现）
+      document.querySelectorAll('audio').forEach(function (a) { a.pause(); });
+    });
   }
 
   function setSprite(name: string): void {

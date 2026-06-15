@@ -73,6 +73,24 @@ contextBridge.exposeInMainWorld('companion', {
   onUpdatePetSize: (callback: (size: number) => void) => {
     ipcRenderer.on('update-pet-size', (_event, size) => callback(size));
   },
+  onTtsPlay: (callback: (base64: string) => void) => {
+    ipcRenderer.on('tts-play', (_event, base64) => callback(base64));
+  },
+  onTtsStop: (callback: () => void) => {
+    ipcRenderer.on('tts-stop', () => callback());
+  },
+  sendTtsPlaybackDone: () => {
+    ipcRenderer.send('tts-playback-done');
+  },
+  loadTTSConfig: (): Promise<any> => {
+    return ipcRenderer.invoke('load-tts-config');
+  },
+  saveTTSConfig: (config: any) => {
+    ipcRenderer.send('save-tts-config', config);
+  },
+  testTTS: (): Promise<any> => {
+    return ipcRenderer.invoke('test-tts');
+  },
   onStateChanged: (callback: (event: any) => void) => {
     ipcRenderer.on('state-changed', (_event, data) => callback(data));
   },

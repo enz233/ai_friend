@@ -142,6 +142,7 @@
     <button class="tab-btn active" data-tab="appearance">外观设置</button>
     <button class="tab-btn" data-tab="chat">聊天模型</button>
     <button class="tab-btn" data-tab="vision">屏幕分析</button>
+    <button class="tab-btn" data-tab="tts">语音</button>
     <button class="tab-btn" data-tab="other">其他</button>
   </div>
 
@@ -271,6 +272,76 @@
       </div>
     </div>
 
+    <!-- 语音 -->
+    <div class="tab-content" id="tab-tts">
+      <h2>语音合成 (TTS)</h2>
+      <hr class="divider">
+      <div class="field">
+        <label style="display: inline-flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="ttsOn" /> 启用语音
+        </label>
+      </div>
+      <div class="field">
+        <label>TTS 模式</label>
+        <select id="ttsMode">
+          <option value="gpt-sovits">GPT-SoVITS（本地模型）</option>
+          <option value="api">外部 TTS API</option>
+        </select>
+      </div>
+
+      <div id="sovitsSection">
+        <h2 style="margin-top: 16px;">GPT-SoVITS 配置</h2>
+        <hr class="divider">
+        <div class="field">
+          <label>API 地址</label>
+          <input type="text" id="gptSovitsURL" placeholder="http://127.0.0.1:9880" />
+          <div class="hint">GPT-SoVITS 运行地址，如 http://127.0.0.1:9880</div>
+        </div>
+        <div class="field">
+          <label>文本语言</label>
+          <select id="gptSovitsTextLang">
+            <option value="zh">中文</option>
+            <option value="en">英文</option>
+            <option value="ja">日文</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="apiSection" style="display: none;">
+        <h2 style="margin-top: 16px;">外部 TTS API 配置</h2>
+        <hr class="divider">
+        <div class="field">
+          <label>API Key</label>
+          <div class="password-wrap">
+            <input type="password" id="ttsApiKey" placeholder="sk-..." />
+            <button class="toggle-pw" id="toggleTtsPw">👁</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>API 地址</label>
+          <input type="text" id="ttsBaseURL" placeholder="https://api.openai.com/v1" />
+        </div>
+        <div class="field">
+          <label>模型</label>
+          <input type="text" id="ttsModel" placeholder="tts-1" />
+        </div>
+        <div class="field">
+          <label>语音</label>
+          <input type="text" id="ttsVoice" placeholder="alloy" />
+        </div>
+        <div class="slider-row">
+          <label>语速</label>
+          <input type="range" id="ttsSpeed" min="0.5" max="2" step="0.1" />
+          <span class="value" id="ttsSpeedVal">1.0</span>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveTtsBtn">保存</button>
+        <button class="btn btn-secondary" id="testTtsBtn">测试语音</button>
+      </div>
+    </div>
+
     <!-- 其他 -->
     <div class="tab-content" id="tab-other">
       <h2>对话记忆</h2>
@@ -344,6 +415,23 @@
       document.getElementById('opacityVal').textContent = Math.round((config.opacity ?? 1.0) * 100) + '%';
     }
 
+    async function loadTTSConfig() {
+      // @ts-ignore
+      var config = await window.companion.loadTTSConfig();
+      if (!config) return;
+      document.getElementById('ttsOn').checked = config.on ?? false;
+      document.getElementById('ttsMode').value = config.mode || 'gpt-sovits';
+      document.getElementById('gptSovitsURL').value = config.gptSovitsURL || 'http://127.0.0.1:9880';
+      document.getElementById('gptSovitsTextLang').value = config.gptSovitsTextLang || 'zh';
+      document.getElementById('ttsApiKey').value = config.ttsApiKey || '';
+      document.getElementById('ttsBaseURL').value = config.ttsBaseURL || 'https://api.openai.com/v1';
+      document.getElementById('ttsModel').value = config.ttsModel || 'tts-1';
+      document.getElementById('ttsVoice').value = config.ttsVoice || 'alloy';
+      document.getElementById('ttsSpeed').value = config.ttsSpeed ?? 1.0;
+      document.getElementById('ttsSpeedVal').textContent = config.ttsSpeed ?? 1.0;
+      toggleTtsSections();
+    }
+
     async function loadChatInfo() {
       try {
         // @ts-ignore
@@ -378,6 +466,28 @@
       };
       // @ts-ignore
       window.companion.saveAIConfig(config);
+    }
+
+    function saveTTSConfig() {
+      var config = {
+        on: document.getElementById('ttsOn').checked,
+        mode: document.getElementById('ttsMode').value,
+        gptSovitsURL: document.getElementById('gptSovitsURL').value,
+        gptSovitsTextLang: document.getElementById('gptSovitsTextLang').value,
+        ttsApiKey: document.getElementById('ttsApiKey').value,
+        ttsBaseURL: document.getElementById('ttsBaseURL').value,
+        ttsModel: document.getElementById('ttsModel').value,
+        ttsVoice: document.getElementById('ttsVoice').value,
+        ttsSpeed: parseFloat(document.getElementById('ttsSpeed').value),
+      };
+      // @ts-ignore
+      window.companion.saveTTSConfig(config);
+    }
+
+    function toggleTtsSections() {
+      var mode = document.getElementById('ttsMode').value;
+      document.getElementById('sovitsSection').style.display = mode === 'gpt-sovits' ? 'block' : 'none';
+      document.getElementById('apiSection').style.display = mode === 'api' ? 'block' : 'none';
     }
 
     // ========== 滑块实时更新 ==========
@@ -516,9 +626,52 @@
       window.companion.openLogFile();
     });
 
+    // TTS 模式切换
+    document.getElementById('ttsMode').addEventListener('change', toggleTtsSections);
+
+    // TTS 语速滑块
+    document.getElementById('ttsSpeed').addEventListener('input', function() {
+      document.getElementById('ttsSpeedVal').textContent = parseFloat(this.value).toFixed(1);
+    });
+
+    // TTS 密码切换
+    document.getElementById('toggleTtsPw').addEventListener('click', function() {
+      var input = document.getElementById('ttsApiKey');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+
+    // 保存 TTS 配置
+    document.getElementById('saveTtsBtn').addEventListener('click', function() {
+      try { saveTTSConfig(); showToast('✓ 语音配置已保存', 'success'); }
+      catch (e) { showToast('✗ 保存失败: ' + (e.message || e), 'error'); }
+    });
+
+    // 测试 TTS
+    document.getElementById('testTtsBtn').addEventListener('click', async function() {
+      var btn = this;
+      btn.disabled = true; btn.textContent = '测试中...';
+      try {
+        saveTTSConfig();
+        var startTime = Date.now();
+        // @ts-ignore
+        var result = await window.companion.testTTS();
+        var latency = Date.now() - startTime;
+        if (result && result.success) {
+          showToast('✓ TTS 连接成功 (' + latency + 'ms)', 'success');
+        } else {
+          showToast('✗ ' + (result ? result.message : '返回值为空'), 'error');
+        }
+      } catch (e) {
+        showToast('✗ 测试失败: ' + (e.message || e), 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = '测试语音';
+      }
+    });
+
     // ========== 初始化 ==========
     loadConfig();
     loadAppearance();
+    loadTTSConfig();
     loadLogPath();
     loadChatInfo();
   </script>

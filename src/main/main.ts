@@ -10,6 +10,8 @@ import { ChatManager } from '../core/chat-manager';
 import { getLogger } from '../core/logger';
 import { AppearanceConfigManager } from '../core/appearance-config';
 import { ScreenAnalyzer } from '../core/screen-analyzer';
+import { TTSConfigManager } from '../core/tts-config';
+import { TTSManager } from '../core/tts-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -22,6 +24,8 @@ let aiService: AIService;
 let chatManager: ChatManager;
 let appearanceConfig: AppearanceConfigManager;
 let screenAnalyzer: ScreenAnalyzer;
+let ttsConfigManager: TTSConfigManager;
+let ttsManager: TTSManager;
 
 // 拖拽状态（主进程端）
 let isDragging = false;
@@ -102,6 +106,8 @@ function createWindow(): void {
   chatManager = new ChatManager(mainWindow, aiConfigManager, aiService, stateManager, timeAwareness);
   appearanceConfig = new AppearanceConfigManager();
   screenAnalyzer = new ScreenAnalyzer(aiConfigManager);
+  ttsConfigManager = new TTSConfigManager();
+  ttsManager = new TTSManager(mainWindow, ttsConfigManager);
 
   // 连接活动监视到 ChatManager
   bubbleManager.setOnActivity((title) => {
@@ -110,6 +116,9 @@ function createWindow(): void {
 
   // 连接情绪系统到 TransitionEngine
   transitionEngine.setEmotionUpdater(chatManager.getEmotionUpdater());
+
+  // 连接 TTS 到 ChatManager
+  chatManager.setTTSManager(ttsManager);
 
   // 定时发送当前状态给渲染进程（用于UI更新）
   setInterval(() => {
@@ -277,6 +286,19 @@ function setupIPC(): void {
     } catch (e: any) {
       return { success: false, message: '测试失败: ' + e.message };
     }
+  });
+
+  // TTS 语音
+  ipcMain.handle('load-tts-config', () => {
+    return ttsConfigManager?.get();
+  });
+
+  ipcMain.on('save-tts-config', (_event, config: any) => {
+    ttsConfigManager?.update(config);
+  });
+
+  ipcMain.handle('test-tts', async () => {
+    return await ttsManager?.test();
   });
 }
 

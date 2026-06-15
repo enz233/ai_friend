@@ -7,6 +7,7 @@ import { EmotionSystem } from './emotion-system';
 import { EmotionUpdater } from './emotion-updater';
 import { TimeAwareness } from './time-awareness';
 import { ScreenAnalyzer } from './screen-analyzer';
+import { TTSManager } from './tts-manager';
 
 export class ChatManager {
   private aiService: AIService;
@@ -17,6 +18,7 @@ export class ChatManager {
   private emotionUpdater: EmotionUpdater;
   private mainWindow: BrowserWindow;
   private screenAnalyzer: ScreenAnalyzer;
+  private ttsManager: TTSManager | null = null;
   private isProcessing = false;
   private lastUserInteraction: number = Date.now();
   private proactiveTimer: ReturnType<typeof setInterval> | null = null;
@@ -119,6 +121,14 @@ export class ChatManager {
 
       // 保存 AI 回复到历史
       this.memory.addMessage('assistant', fullResponse);
+
+      // TTS 语音播放
+      if (this.ttsManager) {
+        const texts = parsedItems.length > 0 ? parsedItems : [fullResponse || ''];
+        for (const text of texts) {
+          await this.ttsManager.speak(text.slice(0, 200)); // 限制长度
+        }
+      }
 
       // 检查是否需要生成摘要（后台异步，不阻塞）
       if (this.memory.shouldSummarize()) {
@@ -293,6 +303,11 @@ export class ChatManager {
   /** 获取情绪更新器（供 TransitionEngine 使用） */
   getEmotionUpdater(): EmotionUpdater {
     return this.emotionUpdater;
+  }
+
+  /** 设置 TTS 管理器 */
+  setTTSManager(ttsManager: TTSManager): void {
+    this.ttsManager = ttsManager;
   }
 }
 

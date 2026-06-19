@@ -121,15 +121,11 @@ export class ChatManager {
       // 保存 AI 回复到历史
       this.memory.addMessage('assistant', fullResponse);
 
-      // TTS 模式：只显示带音频的气泡（TTS 播放时自动显示字幕）
+      // TTS 模式：批量合成，按顺序播放
       // 非 TTS 模式：直接显示气泡
       if (this.ttsManager) {
-        for (let i = 0; i < texts.length; i++) {
-          if (i > 0) {
-            await this.delay(1500 + Math.random() * 1000);
-          }
-          await this.ttsManager.speak(texts[i].slice(0, 200));
-        }
+        const ttsTexts = texts.map(t => t.slice(0, 200));
+        await this.ttsManager.speakAll(ttsTexts);
       } else {
         for (let i = 0; i < texts.length; i++) {
           if (i > 0) {
@@ -347,6 +343,11 @@ export class ChatManager {
   /** 设置 TTS 管理器 */
   setTTSManager(ttsManager: TTSManager): void {
     this.ttsManager = ttsManager;
+  }
+
+  /** 获取记忆模块（供 ObserverManager 使用） */
+  getMemory(): AIMemory {
+    return this.memory;
   }
 }
 

@@ -30,13 +30,11 @@ export class TTSManager {
     this.aiService = aiService;
   }
 
-  /** 合成并播放语音 */
+  /** 合成并播放单条语音 */
   async speak(text: string): Promise<void> {
     const config = this.configManager.get();
-    console.log('[TTS] speak 调用, on:', config.on, 'mode:', config.mode, 'text:', text.slice(0, 30));
     if (!config.on) return;
 
-    // 如果正在播放，加入队列
     if (this.isSpeaking) {
       this.queue.push(text);
       return;
@@ -45,33 +43,73 @@ export class TTSManager {
     this.isSpeaking = true;
 
     try {
-      // 翻译：将文本翻译为 TTS 目标语言
-      let ttsText = text;
-      if (config.ttsLanguage !== 'zh' && this.aiService) {
-        ttsText = await this.translate(text, config.ttsLanguage);
-      }
-
-      // 翻译字幕：将文本翻译为字幕语言
-      let subtitleText = text;
-      if (config.subtitleLanguage !== 'zh' && this.aiService) {
-        subtitleText = await this.translate(text, config.subtitleLanguage);
-      }
-
+      const { ttsText, subtitleText } = await this.prepareText(text, config);
       const audioData = await this.synthesize(ttsText, config);
       if (audioData) {
         await this.play(audioData, subtitleText);
       }
     } catch (error: any) {
-      console.error('[TTS] 语音合成失败:', error.message);
+      console.error('[TTS] speak failed:', error.message);
     } finally {
       this.isSpeaking = false;
-
-      // 播放队列中的下一条
       if (this.queue.length > 0) {
         const next = this.queue.shift()!;
         this.speak(next);
       }
     }
+  }
+
+  /** 批量合成并按顺序播放（流水线模式） */
+  async speakAll(texts: string[]): Promise<void> {
+    const config = this.configManager.get();
+    if (!config.on || texts.length === 0) return;
+
+    this.isSpeaking = true;
+
+    try {
+      // 1. 全部文本并行准备（翻译）
+      const prepared = await Promise.all(
+        texts.map(t => this.prepareText(t, config))
+      );
+
+      // 2. 全部并行合成
+      const audioPromises = prepared.map(p => this.synthesize(p.ttsText, config));
+      const audioResults = await Promise.all(audioPromises);
+
+      // 3. 按顺序播放（第一段立即开始）
+      for (let i = 0; i < audioResults.length; i++) {
+        if (audioResults[i]) {
+          await this.play(audioResults[i]!, prepared[i].subtitleText);
+        }
+        // 段间停顿
+        if (i < audioResults.length - 1) {
+          await this.delay(800 + Math.random() * 400);
+        }
+      }
+    } catch (error: any) {
+      console.error('[TTS] speakAll failed:', error.message);
+    } finally {
+      this.isSpeaking = false;
+    }
+  }
+
+  /** 准备文本：翻译 TTS 语言和字幕语言 */
+  private async prepareText(text: string, config: TTSConfig): Promise<{ ttsText: string; subtitleText: string }> {
+    let ttsText = text;
+    let subtitleText = text;
+
+    if (config.ttsLanguage !== 'zh' && this.aiService) {
+      ttsText = await this.translate(text, config.ttsLanguage);
+    }
+    if (config.subtitleLanguage !== 'zh' && this.aiService) {
+      subtitleText = await this.translate(text, config.subtitleLanguage);
+    }
+
+    return { ttsText, subtitleText };
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /** 调用 AI 翻译文本 */

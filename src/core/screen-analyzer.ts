@@ -34,7 +34,7 @@ export class ScreenAnalyzer {
   }
 
   /** 截取屏幕，返回 base64 data URI */
-  private async captureScreen(): Promise<string | null> {
+  async captureScreen(): Promise<string | null> {
     try {
       const sources = await desktopCapturer.getSources({
         types: ['screen'],

@@ -12,6 +12,7 @@ import { AppearanceConfigManager } from '../core/appearance-config';
 import { ScreenAnalyzer } from '../core/screen-analyzer';
 import { TTSConfigManager } from '../core/tts-config';
 import { TTSManager } from '../core/tts-manager';
+import { ObserverManager } from '../core/observer-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -26,6 +27,7 @@ let appearanceConfig: AppearanceConfigManager;
 let screenAnalyzer: ScreenAnalyzer;
 let ttsConfigManager: TTSConfigManager;
 let ttsManager: TTSManager;
+let observerManager: ObserverManager;
 
 // 拖拽状态（主进程端）
 let isDragging = false;
@@ -121,6 +123,13 @@ function createWindow(): void {
   ttsManager.setAIService(aiService);
   chatManager.setTTSManager(ttsManager);
 
+  // 初始化观察系统
+  observerManager = new ObserverManager(
+    mainWindow, aiService, chatManager.getEmotionUpdater().getEmotionSystem(),
+    stateManager, chatManager.getMemory(), screenAnalyzer, aiConfigManager
+  );
+  observerManager.start(30000); // 每30秒检查一次
+
   // 定时发送当前状态给渲染进程（用于UI更新）
   setInterval(() => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -144,6 +153,7 @@ function setupIPC(): void {
     const bounds = mainWindow.getBounds();
     const companionPos = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
     transitionEngine.handleCursorMove(data, companionPos);
+    observerManager?.recordActivity();
   });
 
   ipcMain.on('drag-start', () => {
@@ -179,6 +189,7 @@ function setupIPC(): void {
 
   ipcMain.on('user-click', () => {
     transitionEngine?.handleInteraction();
+    observerManager?.recordActivity();
   });
 
   ipcMain.on('lonely-action', (_event, active: boolean) => {

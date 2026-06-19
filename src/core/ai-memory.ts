@@ -13,10 +13,17 @@ interface HistoryData {
   sinceLastSummary: number;
 }
 
+interface AppUsage {
+  count: number;        // 使用次数
+  lastSeen: number;     // 最后使用时间
+  description: string;  // Vision API 返回的描述（可选）
+}
+
 interface MemoryData {
   summary: string;
   lastUpdated: number;
   totalMessages: number;
+  appUsage: Record<string, AppUsage>;
 }
 
 const SUMMARY_THRESHOLD = 50;
@@ -68,12 +75,15 @@ export class AIMemory {
     try {
       if (fs.existsSync(this.memoryPath)) {
         const raw = fs.readFileSync(this.memoryPath, 'utf-8');
-        return JSON.parse(raw);
+        const data = JSON.parse(raw);
+        // 兼容旧版本：没有 appUsage 字段时初始化
+        if (!data.appUsage) data.appUsage = {};
+        return data;
       }
     } catch (e) {
       console.error('[AIMemory] 加载记忆失败:', e);
     }
-    return { summary: '', lastUpdated: 0, totalMessages: 0 };
+    return { summary: '', lastUpdated: 0, totalMessages: 0, appUsage: {} };
   }
 
   saveMemory(): void {
@@ -114,7 +124,7 @@ export class AIMemory {
 
   clearAll(): void {
     this.history = { messages: [], sinceLastSummary: 0 };
-    this.memory = { summary: '', lastUpdated: 0, totalMessages: 0 };
+    this.memory = { summary: '', lastUpdated: 0, totalMessages: 0, appUsage: {} };
     this.saveHistory();
     this.saveMemory();
   }
@@ -167,6 +177,47 @@ export class AIMemory {
 
   getSummary(): string {
     return this.memory.summary;
+  }
+
+  // ========== 应用使用记录 ==========
+
+  /** 记录应用使用 */
+  recordAppUsage(appName: string, description?: string): void {
+    if (!appName) return;
+    const existing = this.memory.appUsage[appName];
+    if (existing) {
+      existing.count++;
+      existing.lastSeen = Date.now();
+      if (description) existing.description = description;
+    } else {
+      this.memory.appUsage[appName] = {
+        count: 1,
+        lastSeen: Date.now(),
+        description: description || '',
+      };
+    }
+    this.saveMemory();
+  }
+
+  /** 获取应用使用记录 */
+  getAppUsage(appName: string): AppUsage | undefined {
+    return this.memory.appUsage[appName];
+  }
+
+  /** 获取所有应用使用记录 */
+  getAllAppUsage(): Record<string, AppUsage> {
+    return this.memory.appUsage;
+  }
+
+  /** 判断是否为常用应用（5次以上） */
+  isFrequentApp(appName: string): boolean {
+    const usage = this.memory.appUsage[appName];
+    return usage ? usage.count >= 5 : false;
+  }
+
+  /** 判断是否为新应用 */
+  isNewApp(appName: string): boolean {
+    return !this.memory.appUsage[appName];
   }
 
   // ========== 注入 ==========

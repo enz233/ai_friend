@@ -3,6 +3,7 @@ import { AIConfigManager } from './ai-config';
 import { AIService, ChatMessage } from './ai-service';
 import { AIMemory } from './ai-memory';
 import { StateManager } from './state-manager';
+import { getLogger } from './logger';
 import { EmotionSystem } from './emotion-system';
 import { EmotionUpdater } from './emotion-updater';
 import { TimeAwareness } from './time-awareness';
@@ -48,6 +49,9 @@ export class ChatManager {
       this.emotionUpdater.tick();
     }, 1000);
 
+    // 启动时总结历史上下文成记忆
+    this.memory.summarizeOnStartup(aiService);
+
     // 启动主动消息定时器（每3分钟检查一次）
     this.proactiveTimer = setInterval(() => {
       this.checkProactiveMessage();
@@ -82,19 +86,50 @@ export class ChatManager {
         return;
       }
 
-      // 构建消息数组（含记忆）
+      // 构建三层提示词
       const config = this.configManager.get();
-      const systemPrompt = this.memory.buildSystemPrompt(config.systemPrompt, RESPONSE_FORMAT_PROMPT);
 
-      // 使用情绪系统生成情感提示词
+      // 第三层：当前状态信息
+      const now = new Date();
+      const timeStr = now.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+      const currentState = this.stateManager.getCurrentState();
       const emotionPrompt = this.emotionSystem.toPromptString();
-      const finalUserMessage = emotionPrompt ? emotionPrompt + '\n' + userMessage : userMessage;
+      const statusPrompt = [
+        `当前时间：${timeStr}，星期${dayOfWeek}`,
+        `当前状态：${currentState}`,
+        emotionPrompt ? `当前情绪：${emotionPrompt}` : '',
+      ].filter(Boolean).join('\n');
+
+      const systemPrompt = this.memory.buildSystemPrompt(
+        config.systemPrompt,
+        RESPONSE_FORMAT_PROMPT,
+        statusPrompt
+      );
 
       const messages: ChatMessage[] = [
         { role: 'system', content: systemPrompt },
         ...this.memory.getRecentMessages(config.historyMaxLength - 1),
-        { role: 'user', content: finalUserMessage },
+        { role: 'user', content: userMessage },
       ];
+
+      // Debug: 打印发送给 AI 的完整消息
+      const log = getLogger();
+      log.log('chat', '=== AI Prompt Start ===');
+      for (const msg of messages) {
+        if (msg.role === 'system') {
+          // 系统提示词按【】分段显示
+          const sections = msg.content.split(/(?=【)/);
+          for (const section of sections) {
+            if (section.trim()) {
+              log.log('chat', `[system] ${section.trim()}`);
+            }
+          }
+        } else {
+          log.log('chat', `[${msg.role}] ${msg.content}`);
+        }
+      }
+      log.log('chat', '=== AI Prompt End ===');
 
       // 保存用户消息到历史（在构建消息数组之后，避免重复）
       this.memory.addMessage('user', userMessage);
@@ -348,6 +383,11 @@ export class ChatManager {
   /** 获取记忆模块（供 ObserverManager 使用） */
   getMemory(): AIMemory {
     return this.memory;
+  }
+
+  /** 关闭时总结记忆 */
+  async summarizeOnShutdown(): Promise<void> {
+    await this.memory.summarizeOnShutdown(this.aiService);
   }
 }
 

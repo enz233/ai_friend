@@ -16,6 +16,7 @@ import { ObserverManager } from '../core/observer-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let debugWindow: BrowserWindow | null = null;
 let stateManager: StateManager;
 let timeAwareness: TimeAwareness;
 let transitionEngine: TransitionEngine;
@@ -62,13 +63,16 @@ function createWindow(): void {
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
   mainWindow.loadFile(path.join(__dirname, '..', '..', 'src', 'renderer', 'index.html'));
 
-  // F12 打开独立调试窗口，F11 打开设置
+  // F12 打开 DevTools，F11 打开设置，F3 打开调试窗口
   mainWindow.webContents.on('before-input-event', (_event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
     }
     if (input.key === 'F11' && input.type === 'keyDown') {
       createSettingsWindow();
+    }
+    if (input.key === 'F3' && input.type === 'keyDown') {
+      toggleDebugWindow();
     }
   });
 
@@ -240,8 +244,8 @@ function setupIPC(): void {
   });
 
   // 日志相关
-  ipcMain.on('renderer-log', (_event, level: string, message: string) => {
-    getLogger().debug('Renderer', `[${level}] ${message}`);
+  ipcMain.on('renderer-log', (_event, category: string, message: string) => {
+    getLogger().log(category as any, message);
   });
 
   ipcMain.handle('get-log-path', () => {
@@ -340,6 +344,30 @@ function createSettingsWindow(): void {
   });
 }
 
+function toggleDebugWindow(): void {
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.close();
+    return;
+  }
+  debugWindow = new BrowserWindow({
+    width: 700,
+    height: 500,
+    title: 'Debug - Quiet Companion',
+    resizable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  debugWindow.loadFile(path.join(__dirname, '..', '..', 'src', 'main', 'debug.html'));
+  debugWindow.on('closed', () => {
+    debugWindow = null;
+    getLogger().setDebugWindow(null);
+  });
+  getLogger().setDebugWindow(debugWindow);
+}
+
 function stopDragPoll(): void {
   if (dragPollTimer) {
     clearInterval(dragPollTimer);
@@ -349,6 +377,11 @@ function stopDragPoll(): void {
 
 setupIPC();
 app.whenReady().then(createWindow);
+
+// 关闭时总结记忆
+app.on('before-quit', async () => {
+  await chatManager?.summarizeOnShutdown();
+});
 
 app.on('window-all-closed', () => {
   transitionEngine?.stop();

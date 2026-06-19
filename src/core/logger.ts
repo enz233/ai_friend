@@ -1,13 +1,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import { app, BrowserWindow } from 'electron';
+
+export type LogCategory = 'state' | 'drag' | 'tts' | 'observer' | 'chat' | 'ai' | 'error' | 'info';
+
+interface LogEntry {
+  time: string;
+  category: LogCategory;
+  message: string;
+}
 
 class Logger {
   private logPath: string;
   private stream: fs.WriteStream | null = null;
+  private debugWindow: BrowserWindow | null = null;
+  private logBuffer: LogEntry[] = [];
+  private maxBuffer = 200;
 
   constructor() {
-    // 日志文件放在 app 同级目录的 logs 文件夹
     const logDir = path.join(app.getPath('userData'), 'logs');
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
@@ -23,28 +33,44 @@ class Logger {
     return now.toISOString().replace('T', ' ').slice(0, 23);
   }
 
-  private write(level: string, source: string, message: string): void {
-    const line = `[${this.formatTime()}] [${level}] [${source}] ${message}\n`;
+  private formatTimeShort(): string {
+    const now = new Date();
+    return now.toTimeString().slice(0, 8);
+  }
+
+  /** 写入日志（文件 + 调试窗口） */
+  log(category: LogCategory, message: string): void {
+    const time = this.formatTimeShort();
+    const entry: LogEntry = { time, category, message };
+
+    // 写入文件
+    const line = `[${this.formatTime()}] [${category.toUpperCase()}] ${message}\n`;
     this.stream?.write(line);
+
+    // 发送到调试窗口
+    this.logBuffer.push(entry);
+    if (this.logBuffer.length > this.maxBuffer) {
+      this.logBuffer.shift();
+    }
+    this.sendToDebugWindow(entry);
   }
 
-  info(source: string, message: string): void {
-    this.write('INFO', source, message);
-    console.log(`[${source}] ${message}`);
+  /** 发送日志到调试窗口 */
+  private sendToDebugWindow(entry: LogEntry): void {
+    if (this.debugWindow && !this.debugWindow.isDestroyed()) {
+      this.debugWindow.webContents.send('debug-log', entry);
+    }
   }
 
-  warn(source: string, message: string): void {
-    this.write('WARN', source, message);
-    console.warn(`[${source}] ${message}`);
-  }
-
-  error(source: string, message: string): void {
-    this.write('ERROR', source, message);
-    console.error(`[${source}] ${message}`);
-  }
-
-  debug(source: string, message: string): void {
-    this.write('DEBUG', source, message);
+  /** 设置调试窗口 */
+  setDebugWindow(win: BrowserWindow | null): void {
+    this.debugWindow = win;
+    // 如果有缓冲的日志，发送给新窗口
+    if (win && !win.isDestroyed()) {
+      for (const entry of this.logBuffer) {
+        win.webContents.send('debug-log', entry);
+      }
+    }
   }
 
   /** 获取日志文件路径 */

@@ -91,6 +91,9 @@ contextBridge.exposeInMainWorld('companion', {
   testTTS: (): Promise<any> => {
     return ipcRenderer.invoke('test-tts');
   },
+  onLog: (callback: (data: any) => void) => {
+    ipcRenderer.on('debug-log', (_event, data) => callback(data));
+  },
   onStateChanged: (callback: (event: any) => void) => {
     ipcRenderer.on('state-changed', (_event, data) => callback(data));
   },

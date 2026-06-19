@@ -14,19 +14,31 @@
     }).join(' ');
   }
 
+  /** 从消息中提取分类 */
+  function extractCategory(msg: string): string {
+    if (msg.indexOf('[Drag]') >= 0) return 'drag';
+    if (msg.indexOf('[Visual]') >= 0 || msg.indexOf('[Sprite]') >= 0) return 'state';
+    if (msg.indexOf('[TTS]') >= 0) return 'tts';
+    if (msg.indexOf('[Chat]') >= 0) return 'chat';
+    if (msg.indexOf('[Observer]') >= 0) return 'observer';
+    return 'info';
+  }
+
   console.log = function (...args: any[]) {
+    var msg = serializeArgs(args);
+    var cat = extractCategory(msg);
     // @ts-ignore
-    window.companion.log('LOG', serializeArgs(args));
+    window.companion.log(cat, msg);
     _origLog(...args);
   };
   console.warn = function (...args: any[]) {
     // @ts-ignore
-    window.companion.log('WARN', serializeArgs(args));
+    window.companion.log('info', '[WARN] ' + serializeArgs(args));
     _origWarn(...args);
   };
   console.error = function (...args: any[]) {
     // @ts-ignore
-    window.companion.log('ERROR', serializeArgs(args));
+    window.companion.log('error', serializeArgs(args));
     _origError(...args);
   };
 

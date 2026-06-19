@@ -141,7 +141,15 @@ export class AIMemory {
     // 系统提示
     messages.push({
       role: 'system',
-      content: '你是一个对话摘要助手。请用中文总结以下对话的要点，' + MAX_SUMMARY_LENGTH + '字以内。\n需要包含：用户的偏好、重要信息、对话主题、用户提到的人或事。\n请用简洁的条目式总结，不要冗余。不要加多余的开场白。',
+      content: `你是一个对话摘要助手。请用中文总结以下对话的要点，${MAX_SUMMARY_LENGTH}字以内。
+
+总结要求：
+- 只记录有价值的信息，忽略闲聊
+- 用户的偏好、习惯、重要信息
+- 对话中提到的人或事
+- 不要记录屏幕分析的详细内容
+- 用简洁的条目式总结
+- 不要加开场白或结尾语`,
     });
 
     // 旧记忆（如果有）
@@ -222,11 +230,65 @@ export class AIMemory {
 
   // ========== 注入 ==========
 
-  buildSystemPrompt(basePrompt: string, formatPrompt: string): string {
-    let prompt = basePrompt + '\n\n' + formatPrompt;
+  /** 构建三层提示词 */
+  buildSystemPrompt(
+    personalityPrompt: string,
+    formatPrompt: string,
+    statusPrompt?: string
+  ): string {
+    let parts: string[] = [];
+
+    // 第一层：人格（最重要）
+    parts.push('【以下是你的人格设定】\n' + personalityPrompt);
+
+    // 回复格式
+    parts.push('【回复格式要求】\n' + formatPrompt);
+
+    // 第二层：记忆
     if (this.memory.summary) {
-      prompt += '\n\n以下是你对用户的一些了解：\n' + this.memory.summary;
+      parts.push('【以下是你之前和用户的记忆】\n' + this.memory.summary);
     }
-    return prompt;
+
+    // 第三层：当前状态
+    if (statusPrompt) {
+      parts.push('【以下是你现在的状态】\n' + statusPrompt);
+    }
+
+    return parts.join('\n\n');
+  }
+
+  /** 启动时总结上下文成记忆（合并旧记忆+新对话） */
+  async summarizeOnStartup(aiService: any): Promise<void> {
+    if (this.history.messages.length < 5) return;
+
+    console.log('[AIMemory] startup: summarizing history...');
+    try {
+      const summaryMessages = this.buildSummaryMessages();
+      const summary = await aiService.chat(summaryMessages);
+      if (summary && summary.trim()) {
+        this.applySummary(summary);
+        console.log('[AIMemory] startup summary done');
+      }
+    } catch (e) {
+      console.error('[AIMemory] startup summary failed:', e);
+    }
+  }
+
+  /** 关闭时总结（快速，不等待太久） */
+  async summarizeOnShutdown(aiService: any): Promise<void> {
+    if (this.history.messages.length < 5) return;
+    if (this.history.sinceLastSummary < 5) return; // 最近已经总结过，跳过
+
+    console.log('[AIMemory] shutdown: summarizing...');
+    try {
+      const summaryMessages = this.buildSummaryMessages();
+      const summary = await aiService.chat(summaryMessages);
+      if (summary && summary.trim()) {
+        this.applySummary(summary);
+        console.log('[AIMemory] shutdown summary done');
+      }
+    } catch (e) {
+      console.error('[AIMemory] shutdown summary failed:', e);
+    }
   }
 }

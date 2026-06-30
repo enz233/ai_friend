@@ -21,6 +21,7 @@ export class TransitionEngine {
   private isLonelyAction: boolean = false;
   private dragStartTime: number = 0;
   private emotionUpdater: EmotionUpdater | null = null;
+  private onRelationshipChange: ((delta: number) => void) | null = null;
 
   constructor(stateManager: StateManager, timeAwareness: TimeAwareness) {
     this.stateManager = stateManager;
@@ -111,6 +112,11 @@ export class TransitionEngine {
     this.emotionUpdater = updater;
   }
 
+  /** 设置关系变化回调 */
+  setOnRelationshipChange(callback: (delta: number) => void): void {
+    this.onRelationshipChange = callback;
+  }
+
   /** 光标移动：控制 curious 进入/退出 */
   handleCursorMove(cursor: CursorPosition, companion: CompanionPosition): void {
     const distance = this.calculateDistance(cursor, companion);
@@ -144,13 +150,21 @@ export class TransitionEngine {
   handleDragEnd(): void {
     this.stateManager.recordInteraction();
     this.emotionUpdater?.onDragEnd();
+    // 拖拽时间越长，进入 tried 的概率越高
+    var dragDuration = (Date.now() - this.dragStartTime) / 1000;
+
+    // 拖拽影响好感度
+    if (dragDuration > 5) {
+      this.onRelationshipChange?.(-0.5); // 长时间拖拽 -0.5
+    } else {
+      this.onRelationshipChange?.(-0.2); // 普通拖拽 -0.2
+    }
+
     if (this.timeAwareness.isLateNight()) {
       this.stateManager.tryTransition('sleepy', 'interaction');
       return;
     }
 
-    // 拖拽时间越长，进入 tried 的概率越高
-    var dragDuration = (Date.now() - this.dragStartTime) / 1000;
     var triedChance = Math.min(0.1 + dragDuration * 0.05, 0.6); // 1秒10%，10秒60%
 
     if (Math.random() < triedChance) {

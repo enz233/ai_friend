@@ -123,6 +123,11 @@ function createWindow(): void {
   // 连接情绪系统到 TransitionEngine
   transitionEngine.setEmotionUpdater(chatManager.getEmotionUpdater());
 
+  // 连接拖拽到好感度变化
+  transitionEngine.setOnRelationshipChange((delta) => {
+    chatManager?.changeAffection(delta);
+  });
+
   // 连接 TTS 到 ChatManager，并提供 AI 服务用于翻译
   ttsManager.setAIService(aiService);
   chatManager.setTTSManager(ttsManager);

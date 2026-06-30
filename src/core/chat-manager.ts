@@ -51,6 +51,8 @@ export class ChatManager {
 
     // 启动时总结历史上下文成记忆
     this.memory.summarizeOnStartup(aiService);
+    // 初始化关系
+    this.memory.initRelationship();
 
     // 启动主动消息定时器（每3分钟检查一次）
     this.proactiveTimer = setInterval(() => {
@@ -99,6 +101,7 @@ export class ChatManager {
         `当前时间：${timeStr}，星期${dayOfWeek}`,
         `当前状态：${currentState}`,
         emotionPrompt ? `当前情绪：${emotionPrompt}` : '',
+        this.memory.getRelationshipPrompt(),
       ].filter(Boolean).join('\n');
 
       const systemPrompt = this.memory.buildSystemPrompt(
@@ -155,6 +158,11 @@ export class ChatManager {
 
       // 保存 AI 回复到历史
       this.memory.addMessage('assistant', fullResponse);
+
+      // 关系追踪：聊天增加好感和熟悉
+      this.memory.recordInteraction();
+      this.memory.changeAffection(0.3);     // 普通聊天 +0.3
+      this.memory.changeFamiliarity(0.1);   // 聊天后更熟悉 +0.1
 
       // TTS 模式：批量合成，按顺序播放
       // 非 TTS 模式：直接显示气泡
@@ -383,6 +391,11 @@ export class ChatManager {
   /** 获取记忆模块（供 ObserverManager 使用） */
   getMemory(): AIMemory {
     return this.memory;
+  }
+
+  /** 修改好感度（供 TransitionEngine 使用） */
+  changeAffection(delta: number): void {
+    this.memory.changeAffection(delta);
   }
 
   /** 关闭时总结记忆 */

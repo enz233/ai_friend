@@ -24,6 +24,14 @@ interface MemoryData {
   lastUpdated: number;
   totalMessages: number;
   appUsage: Record<string, AppUsage>;
+  affection: number;              // 好感度 0-100
+  familiarity: number;            // 熟悉度 0-100
+  affectionUpdated: number;       // 上次好感度更新时间
+  familiarityUpdated: number;     // 上次熟悉度更新时间
+  firstSeen: number;              // 首次使用时间
+  totalInteractions: number;      // 总互动次数
+  todayInteractions: number;      // 今日互动次数
+  todayDate: string;              // 今日日期（用于重置每日计数）
 }
 
 const SUMMARY_THRESHOLD = 50;
@@ -83,7 +91,7 @@ export class AIMemory {
     } catch (e) {
       console.error('[AIMemory] 加载记忆失败:', e);
     }
-    return { summary: '', lastUpdated: 0, totalMessages: 0, appUsage: {} };
+    return { summary: '', lastUpdated: 0, totalMessages: 0, appUsage: {}, affection: 50, familiarity: 10, affectionUpdated: 0, familiarityUpdated: 0, firstSeen: Date.now(), totalInteractions: 0, todayInteractions: 0, todayDate: '' };
   }
 
   saveMemory(): void {
@@ -124,7 +132,7 @@ export class AIMemory {
 
   clearAll(): void {
     this.history = { messages: [], sinceLastSummary: 0 };
-    this.memory = { summary: '', lastUpdated: 0, totalMessages: 0, appUsage: {} };
+    this.memory = { summary: '', lastUpdated: 0, totalMessages: 0, appUsage: {}, affection: 50, familiarity: 10, affectionUpdated: 0, familiarityUpdated: 0, firstSeen: Date.now(), totalInteractions: 0, todayInteractions: 0, todayDate: '' };
     this.saveHistory();
     this.saveMemory();
   }
@@ -290,5 +298,99 @@ export class AIMemory {
     } catch (e) {
       console.error('[AIMemory] shutdown summary failed:', e);
     }
+  }
+
+  // ========== 好感度与熟悉度 ==========
+
+  /** 修改好感度（钳位 0-100） */
+  changeAffection(delta: number): void {
+    // 冷却检查：一分钟内不重复变化
+    const now = Date.now();
+    if (now - this.memory.affectionUpdated < 60000) return;
+    this.memory.affectionUpdated = now;
+
+    // 好感度曲线：越高越难涨，越低越难掉
+    const aff = this.memory.affection;
+    let adjusted = delta;
+    if (delta > 0 && aff > 70) adjusted *= 0.7;
+    if (delta > 0 && aff < 30) adjusted *= 1.5;
+    if (delta < 0 && aff < 30) adjusted *= 0.7;
+    if (delta < 0 && aff > 70) adjusted *= 1.5;
+
+    this.memory.affection = Math.max(0, Math.min(100, aff + adjusted));
+    this.saveMemory();
+  }
+
+  /** 修改熟悉度（只增不减，钳位 0-100） */
+  changeFamiliarity(delta: number): void {
+    if (delta <= 0) return; // 只增
+    const now = Date.now();
+    if (now - this.memory.familiarityUpdated < 60000) return;
+    this.memory.familiarityUpdated = now;
+
+    this.memory.familiarity = Math.min(100, this.memory.familiarity + delta);
+    this.saveMemory();
+  }
+
+  /** 获取好感度标签 */
+  private affectionLabel(): string {
+    const a = this.memory.affection;
+    if (a <= 20) return '疏远';
+    if (a <= 40) return '一般';
+    if (a <= 60) return '友好';
+    if (a <= 80) return '亲近';
+    return '亲密';
+  }
+
+  /** 获取熟悉度标签 */
+  private familiarityLabel(): string {
+    const f = this.memory.familiarity;
+    if (f <= 15) return '陌生人';
+    if (f <= 40) return '认识';
+    if (f <= 70) return '朋友';
+    return '老友';
+  }
+
+  /** 记录互动 */
+  recordInteraction(): void {
+    this.memory.totalInteractions++;
+
+    const today = new Date().toDateString();
+    if (this.memory.todayDate !== today) {
+      this.memory.todayDate = today;
+      this.memory.todayInteractions = 0;
+    }
+    this.memory.todayInteractions++;
+    this.saveMemory();
+  }
+
+  /** 获取关系状态提示词 */
+  getRelationshipPrompt(): string {
+    const aff = this.memory.affection;
+    const fam = this.memory.familiarity;
+    const days = Math.floor((Date.now() - (this.memory.firstSeen || Date.now())) / 86400000) || 1;
+
+    return `对你的好感度：${Math.round(aff)}/100（${this.affectionLabel()}）
+对你的熟悉度：${Math.round(fam)}/100（${this.familiarityLabel()}）
+认识时间：约${days}天
+今日互动：${this.memory.todayInteractions}次`;
+  }
+
+  /** 初始化关系（首次运行时调用） */
+  initRelationship(): void {
+    const now = Date.now();
+    if (!this.memory.firstSeen) {
+      this.memory.firstSeen = now;
+    }
+    if (!this.memory.affection) {
+      this.memory.affection = 50;
+    }
+    if (!this.memory.familiarity) {
+      // 根据历史消息数计算初始熟悉度
+      const base = Math.min(Math.floor(this.history.messages.length / 100) * 5, 20);
+      this.memory.familiarity = Math.max(10, base);
+    }
+    this.memory.todayDate = new Date().toDateString();
+    this.saveMemory();
   }
 }

@@ -3,7 +3,6 @@ dist/
 *.log
 cankao/
 release/
-*.exe
 src/config/ai-config.json
 src/config/ai-memory.json
 src/config/chat-history.json
